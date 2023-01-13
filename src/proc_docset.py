@@ -56,20 +56,32 @@ def tokenization(doc_id):
       if (docType == 'apw' or docType == 'xie'):
          articles += '_' + 'ENG'
 
-   try:
+   corpora = '1' # 1:AQUAINT-2, 2:AQUAINT, 3:TAC 2011 shared task
+
+
+   try: #AQUAINT-2
       tree = ET.parse(dir + '/' + articles)
    except:
-      try:
+      try: #AQUAINT
+         corpora = '2'
          f = open(dir + '/' + articles, 'r')
          parser = etree.XMLParser(recover=True)
          tree = etree.parse(f, parser)
-      except:
-         dir = '/corpora/LDC/LDC10E12/12/TAC_2010_KBP_Source_Data/data/2009/nw'
-         print("can't find xml rile")
-         pdb.set_trace()
+      except: #TAC 2011 shared task
+         try:
+            corpora = '3'
+            dir = '/corpora/LDC/LDC10E12/12/TAC_2010_KBP_Source_Data/data/2009/nw/'
+            subdir = docType[0:3] + '_' + doc_id[4:7].lower() + '/' + doc_id[8:16]
+            allFile = os.listdir(dir+subdir)
+            for file in allFile:
+               if (doc_id in file):
+                  tree = ET.parse(dir+subdir+'/'+file)
+         except:
+            print("can't find xml rile")
+            pdb.set_trace()
 
 
-   if (doc_id_length == 21): #2004-2006
+   if (corpora == '1'): #2004-2006
       root = tree.getroot()
       for child in range(len(root)):
          #print(root[child].tag, root[child].attrib)
@@ -119,7 +131,7 @@ def tokenization(doc_id):
                      result += '\n'
                   result += '\n'
 
-   else: #1996-2000  
+   elif (corpora == '2'): #1996-2000  
       '''
       DOMTree = xml.dom.minidom.parse(dir + '/' + articles)
       collection = DOMTree.documentElement
@@ -139,6 +151,25 @@ def tokenization(doc_id):
       # need to implement
       pass
 
+   else:
+      root = tree.getroot()
+
+      for child in range(len(root)):
+         if (root[child].tag == 'BODY'):
+            for i in range(len(root[child])):
+               if (root[child][i].tag == 'HEADLINE'):
+                  headline = root[child][i].text.strip('\n')
+                  result += headline + '\n\n'
+               if (root[child][i].tag == 'TEXT'):
+                  for j in range (len(root[child][i])):
+                     para = root[child][i][j].text.strip('\n')
+                     sent_text = nltk.sent_tokenize(para) #split a paragraph to one or multiple sentences.
+                     for sentence in sent_text:
+                        tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
+                        for token in tokens:
+                           result += token + ' '
+                        result += '\n'
+                     result += '\n'        
    return result
 
 
@@ -181,7 +212,7 @@ def process(path):
             output_file.close()
 
 def main():
-   # process("/dropbox/22-23/575x/Data/Documents/training/2009/UpdateSumm09_test_topics.xml")
+   process("/dropbox/22-23/575x/Data/Documents/training/2009/UpdateSumm09_test_topics.xml")
    process("/dropbox/22-23/575x/Data/Documents/evaltest/GuidedSumm11_test_topics.xml")
    # process("/dropbox/22-23/575x/Data/Documents/devtest/GuidedSumm10_test_topics.xml")
 
