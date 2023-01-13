@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from lxml import etree
 import nltk
 from nltk.tokenize import word_tokenize
+import re
 
 
 '''
@@ -51,12 +52,23 @@ def tokenization(doc_id):
       docType = doc_id[0:3].lower() #e.g. 'APW'
       year = doc_id[3:7]
       dir += docType + '/' + year
-      articles = doc_id[3:11] + '_' + docType
-      if (docType == 'APW' or 'XIE'):
+      articles = doc_id[3:11] + '_' + docType.upper()
+      if (docType == 'apw' or docType == 'xie'):
          articles += '_' + 'ENG'
 
+   try:
+      tree = ET.parse(dir + '/' + articles)
+   except:
+      try:
+         f = open(dir + '/' + articles, 'r')
+         parser = etree.XMLParser(recover=True)
+         tree = etree.parse(f, parser)
+      except:
+         dir = '/corpora/LDC/LDC10E12/12/TAC_2010_KBP_Source_Data/data/2009/nw'
+         print("can't find xml rile")
+         pdb.set_trace()
 
-   tree = ET.parse(dir + '/' + articles + '.xml')
+
    if (doc_id_length == 21): #2004-2006
       root = tree.getroot()
       for child in range(len(root)):
@@ -65,16 +77,26 @@ def tokenization(doc_id):
             headline = root[child][0].text.strip('\n')
             result += headline + '\n\n'
             format = False
+            # if (doc_id == "APW_ENG_20041118.0081"):
+            #    pdb.set_trace()
             try:
                TEXT = root[child][2]
                if (TEXT[0].tag == 'P'):
                   format = True
                else:
-                  print("strange format")
+                  print("unexpected format1")
                   pdb.set_trace()         
             except:
-               wholeTEXT = root[child][1]
-               TEXT = wholeTEXT.text.split('\n\n') 
+               try:
+                  if (root[child][1][0].tag == 'P'):
+                     format = True
+                     TEXT = root[child][1]
+                  else:
+                     print("unexpected format2")
+                     pdb.set_trace()   
+               except:
+                  wholeTEXT = root[child][1]
+                  TEXT = wholeTEXT.text.split('\n\n') 
 
             if (format == True):
                for paragraph in TEXT:
@@ -97,7 +119,23 @@ def tokenization(doc_id):
                      result += '\n'
                   result += '\n'
 
-   else: #1996-2000
+   else: #1996-2000  
+      '''
+      DOMTree = xml.dom.minidom.parse(dir + '/' + articles)
+      collection = DOMTree.documentElement
+      topics = collection.getElementsByTagName("topic")
+      '''
+      # Having trouble with this part cause the xml files have very different format
+
+      # root = tree.getroot()
+      # itr = tree.getiterator
+      # DOCNO = tree.findall("DOCNO")
+      # for child in range(len(root)):  
+      #    pdb.set_trace()
+      #    if (doc_id in root[child].text):
+      #       if (root[child][2].tag = 'BODY'):
+      #          headline = root[child][2][0]
+      #    pdb.set_trace()
       # need to implement
       pass
 
@@ -143,9 +181,9 @@ def process(path):
             output_file.close()
 
 def main():
-   process("/dropbox/22-23/575x/Data/Documents/training/2009/UpdateSumm09_test_topics.xml")
-   # process("/dropbox/22-23/575x/Data/Documents/evaltest/GuidedSumm11_test_topics.xml")
-   # process("/dropbox/22-23/575x/Data/Documents/devtest/GuidedSumm10_test_topics")
+   # process("/dropbox/22-23/575x/Data/Documents/training/2009/UpdateSumm09_test_topics.xml")
+   process("/dropbox/22-23/575x/Data/Documents/evaltest/GuidedSumm11_test_topics.xml")
+   # process("/dropbox/22-23/575x/Data/Documents/devtest/GuidedSumm10_test_topics.xml")
 
 if __name__ == "__main__":
     main()
