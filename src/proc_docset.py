@@ -62,23 +62,26 @@ def tokenization(doc_id):
    try: #AQUAINT-2
       tree = ET.parse(dir + '/' + articles)
    except:
-      try: #AQUAINT
-         corpora = '2'
-         f = open(dir + '/' + articles, 'r')
-         parser = etree.XMLParser(recover=True)
-         tree = etree.parse(f, parser)
-      except: #TAC 2011 shared task
-         try:
-            corpora = '3'
-            dir = '/corpora/LDC/LDC10E12/12/TAC_2010_KBP_Source_Data/data/2009/nw/'
-            subdir = docType[0:3] + '_' + doc_id[4:7].lower() + '/' + doc_id[8:16]
-            allFile = os.listdir(dir+subdir)
-            for file in allFile:
-               if (doc_id in file):
-                  tree = ET.parse(dir+subdir+'/'+file)
-         except:
-            print("can't find xml rile")
-            pdb.set_trace()
+      try:
+         tree = ET.parse(dir + '/' + articles + '.xml')
+      except:
+         try: #AQUAINT
+            corpora = '2'
+            f = open(dir + '/' + articles, 'r')
+            parser = etree.XMLParser(recover=True)
+            tree = etree.parse(f, parser)
+         except: #TAC 2011 shared task
+            try:
+               corpora = '3'
+               dir = '/corpora/LDC/LDC10E12/12/TAC_2010_KBP_Source_Data/data/2009/nw/'
+               subdir = docType[0:3] + '_' + doc_id[4:7].lower() + '/' + doc_id[8:16]
+               allFile = os.listdir(dir+subdir)
+               for file in allFile:
+                  if (doc_id in file):
+                     tree = ET.parse(dir+subdir+'/'+file)
+            except:
+               print("can't find xml rile")
+               pdb.set_trace()
 
 
    if (corpora == '1'): #2004-2006
