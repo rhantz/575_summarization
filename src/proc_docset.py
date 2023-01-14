@@ -24,6 +24,7 @@ def tokenization(doc_id):
    '''
    We will first find the article based on the doc id. Articles published in 1996-2000 is in /corpora/LDC/LDC02T31/.
    Articles published in 2004-2006 is in /corpora/LDC/LDC08T25/data/
+   If an article is not in the two dirs above, then it is in /corpora/LDC/LDC10E12/12/TAC_2010_KBP_Source_Data/data/2009/nw/
    '''
    result = '' #result contains headline of an article and its tokenization result
    dir = ''
@@ -34,14 +35,6 @@ def tokenization(doc_id):
       dir = '/corpora/LDC/LDC08T25/data/'
    else:
       print("error, not in any dataset")
-   # year = int(doc_id[8:12]) #e.g. '2004'
-   # if (1996 <= year <= 2000):
-   #    dir = '/corpora/LDC/LDC02T31/'
-   # elif (2004 <= year <= 2006):
-   #    dir = '/corpora/LDC/LDC08T25/data/'
-   # else:
-   #    print("error, not in any dataset")
-   #    pdb.set_trace()
    
    subdir = ""
    if (doc_id_length == 21):
@@ -53,8 +46,11 @@ def tokenization(doc_id):
       year = doc_id[3:7]
       dir += docType + '/' + year
       articles = doc_id[3:11] + '_' + docType.upper()
-      if (docType == 'apw' or docType == 'xie'):
+      if (docType == 'apw' or docType == 'xie'):  # '19980601_APW_ENG' compare with '19980601_NYT'
          articles += '_' + 'ENG'
+      if (docType == 'xie'):
+         articles = articles.replace('XIE', 'XIN')
+
 
    corpora = '1' # 1:AQUAINT-2, 2:AQUAINT, 3:TAC 2011 shared task
 
@@ -68,8 +64,18 @@ def tokenization(doc_id):
          try: #AQUAINT
             corpora = '2'
             f = open(dir + '/' + articles, 'r')
+            lines = f.readlines()
+            lines.insert(0, '<tag>\n')
+            lines.append('</tag>\n')
+            tmpFile = open('tmp.txt','w')
+            for item in lines:
+	            tmpFile.write(item)
+            tmpFile.close()
+            f = open('tmp.txt', 'r')
             parser = etree.XMLParser(recover=True)
             tree = etree.parse(f, parser)
+            f.close()
+            os.remove('tmp.txt')
          except: #TAC 2011 shared task
             try:
                corpora = '3'
@@ -90,7 +96,7 @@ def tokenization(doc_id):
          #print(root[child].tag, root[child].attrib)
          if (root[child].attrib['id'] == doc_id):
             headline = root[child][0].text.strip('\n')
-            result += headline + '\n\n'
+            result += 'headline: ' + headline + '\n\n'
             format = False
             # if (doc_id == "APW_ENG_20041118.0081"):
             #    pdb.set_trace()
@@ -141,28 +147,139 @@ def tokenization(doc_id):
       topics = collection.getElementsByTagName("topic")
       '''
       # Having trouble with this part cause the xml files have very different format
-
-      # root = tree.getroot()
-      # itr = tree.getiterator
-      # DOCNO = tree.findall("DOCNO")
-      # for child in range(len(root)):  
-      #    pdb.set_trace()
-      #    if (doc_id in root[child].text):
-      #       if (root[child][2].tag = 'BODY'):
-      #          headline = root[child][2][0]
-      #    pdb.set_trace()
-      # need to implement
-      pass
-
-   else:
       root = tree.getroot()
+      for child in range(len(root)): 
+         if (doc_id in root[child][0].text):         
+            if (root[child][2].tag == 'BODY'):
+               if (root[child][2][1].tag == 'HEADLINE'):
+                  headline = root[child][2][1].text
+                  result += 'headline: ' + headline + '\n\n'
+               elif (root[child][2][0].tag == 'HEADLINE'):
+                  headline = root[child][2][1].text
+                  result += 'headline: ' + headline + '\n\n'
+               try:
+                  if (root[child][2][2].tag == 'TEXT'):
+                     TEXT = root[child][2][2]
+                     for p in TEXT:
+                        para = p.text.strip('\n')
+                        sent_text = nltk.sent_tokenize(para) #Split a paragraph to one or multiple sentences.
+                        for sentence in sent_text:
+                           tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
+                           for token in tokens:
+                              result += token + ' '
+                           result += '\n'
+                        result += '\n'
+               except:
+                  try:
+                     if (root[child][2][1].tag == 'TEXT'):
+                        TEXT = root[child][2][1]
+                        for p in TEXT:
+                           para = p.text.strip('\n')
+                           sent_text = nltk.sent_tokenize(para) #Split a paragraph to one or multiple sentences.
+                           for sentence in sent_text:
+                              tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
+                              for token in tokens:
+                                 result += token + ' '
+                              result += '\n'
+                           result += '\n'
+                  except:
+                     print("different format 1")
+                     pdb.set_trace()
+            elif (root[child][3].tag == 'BODY'):
+               if (root[child][3][0].tag == 'HEADLINE'):
+                  headline = root[child][3][0].text
+                  result += 'headline: ' + headline + '\n\n'
+  
+               if (root[child][3][1].tag == 'TEXT'):
+                  TEXT = root[child][3][1]
+                  for p in TEXT:
+                     para = p.text.strip('\n')
+                     sent_text = nltk.sent_tokenize(para) #Split a paragraph to one or multiple sentences.
+                     for sentence in sent_text:
+                        tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
+                        for token in tokens:
+                           result += token + ' '
+                        result += '\n'
+                     result += '\n'
+  
+               else:
+                  print("different format 4")
+                  pdb.set_trace()
+            elif (root[child][4].tag == 'BODY'):
+               # if (root[child][4][1] == 'HEADLINE'):
+               #    headline = root[child][4][1].text
+               if (root[child][4][0].tag == 'TEXT'):
+                     # no headline
+                     TEXT = root[child][4][0]
+                     for p in TEXT:
+                        para = p.text.strip('\n')
+                        sent_text = nltk.sent_tokenize(para) #Split a paragraph to one or multiple sentences.
+                        for sentence in sent_text:
+                           tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
+                           for token in tokens:
+                              result += token + ' '
+                           result += '\n'
+                        result += '\n'
 
+               elif (root[child][4][1].tag == 'TEXT'):
+                  # no headline
+                  result += 'headline: ' + '\n\n'
+                  TEXT = root[child][4][1]
+                  for p in TEXT:
+                     para = p.text.strip('\n')
+                     sent_text = nltk.sent_tokenize(para) #Split a paragraph to one or multiple sentences.
+                     for sentence in sent_text:
+                        tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
+                        for token in tokens:
+                           result += token + ' '
+                        result += '\n'
+                     result += '\n'
+ 
+               else:
+                  if (root[child][4][1].tag == 'HEADLINE'):
+                     headline = root[child][4][1].text 
+                     result += 'headline: ' + headline + '\n\n'
+                  
+                  if (root[child][4][1].tag == 'TEXT'):
+                     TEXT = root[child][4][1]
+                     for p in TEXT:
+                        para = p.text.strip('\n')
+                        sent_text = nltk.sent_tokenize(para) #Split a paragraph to one or multiple sentences.
+                        for sentence in sent_text:
+                           tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
+                           for token in tokens:
+                              result += token + ' '
+                           result += '\n'
+                        result += '\n'
+
+                  elif (root[child][4][2].tag == 'TEXT'):
+                     TEXT = root[child][4][2]
+                     for p in TEXT:
+                        para = p.text.strip('\n')
+                        sent_text = nltk.sent_tokenize(para) #Split a paragraph to one or multiple sentences.
+                        for sentence in sent_text:
+                           tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
+                           for token in tokens:
+                              result += token + ' '
+                           result += '\n'
+                        result += '\n'
+                  else:
+                     print("different format 3")
+                     pdb.set_trace()
+            else:
+               print("different format 2")
+               pdb.set_trace()
+
+ 
+
+   else: #TAC_share task
+      root = tree.getroot()
       for child in range(len(root)):
          if (root[child].tag == 'BODY'):
             for i in range(len(root[child])):
                if (root[child][i].tag == 'HEADLINE'):
                   headline = root[child][i].text.strip('\n')
-                  result += headline + '\n\n'
+                  result += 'headline: ' + headline + '\n\n'
                if (root[child][i].tag == 'TEXT'):
                   for j in range (len(root[child][i])):
                      para = root[child][i][j].text.strip('\n')
@@ -194,7 +311,7 @@ def process(path):
 
       for docSetA in docsetAs:
          # For each docSetA, we will create a directory under output_dir. The name of the subdirectory is the same as the docsetA id.
-         directory = docSetA.getAttribute("id")
+         directory = docSetA.getAttribute("id")  #Get the id for docSetA
          path = '../outputs/' + mode + '/' + directory
          if not os.path.exists(path):
             os.makedirs(path)
@@ -217,7 +334,7 @@ def process(path):
 def main():
    process("/dropbox/22-23/575x/Data/Documents/training/2009/UpdateSumm09_test_topics.xml")
    process("/dropbox/22-23/575x/Data/Documents/evaltest/GuidedSumm11_test_topics.xml")
-   # process("/dropbox/22-23/575x/Data/Documents/devtest/GuidedSumm10_test_topics.xml")
+   process("/dropbox/22-23/575x/Data/Documents/devtest/GuidedSumm10_test_topics.xml")
 
 if __name__ == "__main__":
     main()
