@@ -1,2 +1,8 @@
 #!/bin/sh
-/nopt/python-3.6/bin/python3 proc_docset.py
+
+source ~/anaconda3/etc/profile.d/conda.sh
+conda activate ../env
+
+# Preprocess document
+echo "Preprocessing documents"
+python3 proc_docset.py

@@ -5,6 +5,7 @@ import os
 import xml.etree.ElementTree as ET
 from lxml import etree
 import nltk
+nltk.download('punkt')
 from nltk.tokenize import word_tokenize
 import re
 

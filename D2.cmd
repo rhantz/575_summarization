@@ -1,4 +1,4 @@
-executable = D2_run.sh
+executable = ./src/proc_docset.sh
 getenv     = true
 error      = D2.error
 log        = D2.log
