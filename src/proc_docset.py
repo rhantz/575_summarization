@@ -112,7 +112,7 @@ def tokenization(doc_id):
             if (DOC_id == doc_id):                     
                HEADLINE = DOC.findall('HEADLINE')
                if (len(HEADLINE) > 0):
-                  headline = HEADLINE[0].text
+                  headline = HEADLINE[0].text.strip('\n')
                   result += 'headline: ' + headline + '\n\n'
                TEXT = DOC.findall('TEXT')
                if (len(TEXT[0]) == 0): #no <p>. Content stored directly in <TEXT>                    
@@ -157,7 +157,7 @@ def tokenization(doc_id):
                   BODY = DOC.findall('BODY')
                   HEADLINE = BODY[0].findall('HEADLINE')
                   if (len(HEADLINE) > 0):
-                     headline = HEADLINE[0].text
+                     headline = HEADLINE[0].text.strip('\n')
                      result += 'headline: ' + headline + '\n\n'
                   TEXT = BODY[0].findall('TEXT')
                   if (len(TEXT[0]) == 0): #no <p>. Content stored directly in <TEXT>                    
