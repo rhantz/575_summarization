@@ -29,10 +29,13 @@ def tokenization(doc_id):
    '''
    result = '' #result contains headline of an article and its tokenization result
    dir = ''
+   corpora = '1' # 1:AQUAINT-2, 2:AQUAINT, 3:TAC 2011 shared task
+
    doc_id_length = len(doc_id)
-   if (doc_id_length == 16):    
+   if (doc_id_length == 16):    #AQUAINT
       dir = '/corpora/LDC/LDC02T31/'
-   elif (doc_id_length == 21):
+      corpora = '2'
+   elif (doc_id_length == 21): #AQUAINT-2
       dir = '/corpora/LDC/LDC08T25/data/'
    else:
       print("error, not in any dataset")
@@ -53,93 +56,89 @@ def tokenization(doc_id):
          articles = articles.replace('XIE', 'XIN')
 
 
-   corpora = '1' # 1:AQUAINT-2, 2:AQUAINT, 3:TAC 2011 shared task
-
-
-   try: #AQUAINT-2
-      tree = ET.parse(dir + '/' + articles)
-   except:
-      try:
-         tree = ET.parse(dir + '/' + articles + '.xml')
+   if (corpora == '1'):
+      try: #AQUAINT-2
+         f = open(dir + '/' + articles, 'r')            
+         parser = etree.XMLParser(recover=True)
+         tree = etree.parse(f, parser)
       except:
-         try: #AQUAINT
-            corpora = '2'
-            f = open(dir + '/' + articles, 'r')
-            lines = f.readlines()
-            lines.insert(0, '<tag>\n')
-            lines.append('</tag>\n')
-            tmpFile = open('tmp.txt','w')
-            for item in lines:
-	            tmpFile.write(item)
-            tmpFile.close()
-            f = open('tmp.txt', 'r')            
+         try:
+            f = open(dir + '/' + articles + '.xml','r')               
             parser = etree.XMLParser(recover=True)
             tree = etree.parse(f, parser)
-            f.close()
-            os.remove('tmp.txt')
-         except: #TAC 2011 shared task
-            try:
-               corpora = '3'
-               dir = '/corpora/LDC/LDC10E12/12/TAC_2010_KBP_Source_Data/data/2009/nw/'
-               subdir = docType[0:3] + '_' + doc_id[4:7].lower() + '/' + doc_id[8:16]
-               allFile = os.listdir(dir+subdir)
-               for file in allFile:
-                  if (doc_id in file):
-                     tree = ET.parse(dir+subdir+'/'+file)
-            except:
-               print("can't find xml rile")
-               pdb.set_trace()
+         except:
+            corpora = '3'
+   if (corpora == '2'):
+      try: #AQUAINT
+         f = open(dir + '/' + articles, 'r')
+         lines = f.readlines()
+         lines.insert(0, '<tag>\n')
+         lines.append('</tag>\n')
+         tmpFile = open('tmp.txt','w')
+         for item in lines:
+            tmpFile.write(item)
+         tmpFile.close()
+         f = open('tmp.txt', 'r')            
+         parser = etree.XMLParser(recover=True)
+         tree = etree.parse(f, parser)
+         f.close()
+         os.remove('tmp.txt')
+      except:
+         corpora = '3'
+
+   if (corpora == '3'): #TAC 2011 shared task
+      try:
+         dir = '/corpora/LDC/LDC10E12/12/TAC_2010_KBP_Source_Data/data/2009/nw/'
+         subdir = docType[0:3] + '_' + doc_id[4:7].lower() + '/' + doc_id[8:16]
+         allFile = os.listdir(dir+subdir)
+         for file in allFile:
+            if (doc_id in file):
+               tree = ET.parse(dir+subdir+'/'+file)
+      except:
+         print("can't find xml rile")
+         pdb.set_trace()
 
 
    if (corpora == '1'): #2004-2006
-      root = tree.getroot()
-      for child in range(len(root)):
-         #print(root[child].tag, root[child].attrib)
-         if (root[child].attrib['id'] == doc_id):
-            headline = root[child][0].text.strip('\n')
-            result += 'headline: ' + headline + '\n\n'
-            format = False
-            # if (doc_id == "APW_ENG_20041118.0081"):
-            #    pdb.set_trace()
-            try:
-               TEXT = root[child][2]
-               if (TEXT[0].tag == 'P'):
-                  format = True
+      try:
+         root = tree.getroot()
+      except:
+         print("local variable 'tree' referenced before assignment")
+         pdb.set_trace()
+      DOCs = root.findall('DOC')
+      if (len(DOCs) > 0):
+         for DOC in DOCs:
+            DOC_id = DOC.attrib['id']
+            if (DOC_id == doc_id):                     
+               HEADLINE = DOC.findall('HEADLINE')
+               if (len(HEADLINE) > 0):
+                  headline = HEADLINE[0].text
+                  result += 'headline: ' + headline + '\n\n'
+               TEXT = DOC.findall('TEXT')
+               if (len(TEXT[0]) == 0): #no <p>. Content stored directly in <TEXT>                    
+                  for para in TEXT[0].text.strip('\n').split('\n\t'):
+                     sent_text = nltk.sent_tokenize(para) #Split a paragraph to one or multiple sentences.
+                     for sentence in sent_text:
+                        tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
+                        for token in tokens:
+                           result += token + ' '
+                        result += '\n'
+                  result += '\n'
                else:
-                  print("unexpected format1")
-                  pdb.set_trace()         
-            except:
-               try:
-                  if (root[child][1][0].tag == 'P'):
-                     format = True
-                     TEXT = root[child][1]
-                  else:
-                     print("unexpected format2")
-                     pdb.set_trace()   
-               except:
-                  wholeTEXT = root[child][1]
-                  TEXT = wholeTEXT.text.split('\n\n') 
+                  for p in TEXT[0]:
+                     para = p.text.strip('\n')
+                     sent_text = nltk.sent_tokenize(para) #Split a paragraph to one or multiple sentences.
+                     for sentence in sent_text:
+                        tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
+                        for token in tokens:
+                           result += token + ' '
+                        result += '\n'
+                     result += '\n'
+          
+      else:
+         print('no DOC')
+         pdb.set_trace() 
 
-            if (format == True):
-               for paragraph in TEXT:
-                  para = paragraph.text.strip('\n')
-                  sent_text = nltk.sent_tokenize(para) #split a paragraph to one or multiple sentences.
-                  for sentence in sent_text:
-                     tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
-                     for token in tokens:
-                        result += token + ' '
-                     result += '\n'
-                  result += '\n'
-            else:
-               for paragraph in TEXT:
-                  para = paragraph.strip('\n')
-                  sent_text = nltk.sent_tokenize(para) #split a paragraph to one or multiple sentences.
-                  for sentence in sent_text:
-                     tokens = word_tokenize(sentence) #For each sentence, tokenize it.           
-                     for token in tokens:
-                        result += token + ' '
-                     result += '\n'
-                  result += '\n'
 
    elif (corpora == '2'): #1996-2000  
       '''
@@ -155,8 +154,6 @@ def tokenization(doc_id):
             DOC_id = DOC.findall('DOCNO')
             if (len(DOC_id) == 1):               
                if (doc_id in DOC_id[0].text):
-                  # if ("APW19980718" in doc_id):
-                  #    pdb.set_trace()
                   BODY = DOC.findall('BODY')
                   HEADLINE = BODY[0].findall('HEADLINE')
                   if (len(HEADLINE) > 0):
