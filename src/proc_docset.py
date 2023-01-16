@@ -114,6 +114,10 @@ def tokenization(doc_id):
                if (len(HEADLINE) > 0):
                   headline = HEADLINE[0].text.strip('\n')
                   result += 'headline: ' + headline + '\n\n'
+               DATELINE = DOC.findall('DATELINE')
+               if (len(DATELINE) > 0):
+                  dateline = DATELINE[0].text.strip('\n')
+                  result += 'date-time: ' + dateline + '\n\n'
                TEXT = DOC.findall('TEXT')
                if (len(TEXT[0]) == 0): #no <p>. Content stored directly in <TEXT>                    
                   for para in TEXT[0].text.strip('\n').split('\n\t'):
@@ -154,11 +158,15 @@ def tokenization(doc_id):
             DOC_id = DOC.findall('DOCNO')
             if (len(DOC_id) == 1):               
                if (doc_id in DOC_id[0].text):
+                  DATE_TIME = DOC.findall('DATE_TIME')
                   BODY = DOC.findall('BODY')
                   HEADLINE = BODY[0].findall('HEADLINE')
                   if (len(HEADLINE) > 0):
                      headline = HEADLINE[0].text.strip('\n')
                      result += 'headline: ' + headline + '\n\n'
+                  if (len(DATE_TIME) > 0):
+                     dateline = DATE_TIME[0].text.strip('\n')
+                     result += 'date-time: ' + dateline + '\n\n'
                   TEXT = BODY[0].findall('TEXT')
                   if (len(TEXT[0]) == 0): #no <p>. Content stored directly in <TEXT>                    
                      for para in TEXT[0].text.strip('\n').split('\n\t'):
@@ -195,11 +203,17 @@ def tokenization(doc_id):
    else: #TAC_share task
       root = tree.getroot()
       for child in range(len(root)):
+         if (root[child].tag == 'DATETIME'):
+            DATELINE = root[child].text.strip('\n')
          if (root[child].tag == 'BODY'):
             for i in range(len(root[child])):
                if (root[child][i].tag == 'HEADLINE'):
                   headline = root[child][i].text.strip('\n')
                   result += 'headline: ' + headline + '\n\n'
+                  try:
+                     result += 'date-time: ' + DATELINE + '\n\n'
+                  except:
+                     pass
                if (root[child][i].tag == 'TEXT'):
                   for j in range (len(root[child][i])):
                      para = root[child][i][j].text.strip('\n')
