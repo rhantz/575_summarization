@@ -2,7 +2,7 @@ from pulp import LpMaximize, LpProblem, LpVariable, lpSum
 from nltk.stem.snowball import SnowballStemmer
 from nltk.util import bigrams
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, isdir
 from nltk.corpus import stopwords
 import nltk
 nltk.download('stopwords')
@@ -12,15 +12,12 @@ from itertools import zip_longest
 from collections import Counter
 
 
-
 def remove_rare_concepts(concepts):
-    # TODO
     """Removes concepts that occur in less than 3 documents"""
     return Counter({concept: weight for concept, weight in concepts.items() if weight >= 3})
 
 
 def build_occurence_matrix(concepts, sentences):
-    # TODO
     """builds tuple-indexed dictionary (O_ij) of whether concept_i appears in sentence_j
 
         {(i, j) : [0, 1]}
@@ -61,7 +58,7 @@ def read_sentences(topic_id):
     articles = [f for f in listdir(topic_directory) if isfile(join(topic_directory, f))]
 
     # sorts articles by date
-    articles = sorted(articles, key=lambda x: float(x[3:]))
+    articles = sorted(articles, key=lambda x: float(x[-13:]))
 
     all_sents = []
     concept_weights = Counter()
@@ -84,63 +81,57 @@ if __name__ == '__main__':
     stop_words = set(stopwords.words("english"))
     max_length = 100
 
-    sentences, concept_weights = read_sentences("D1001A-A")
-    concept_weights = remove_rare_concepts(concept_weights)
-    concepts = sorted(concept_weights.keys())
+    directory = "../outputs/devtest/"
+    topic_ids = [d for d in listdir(directory) if not isfile(join(directory, d))]
 
-    # Build occurence matrix
-    occurence = build_occurence_matrix(concepts, sentences)
+    for topic_id in topic_ids:
+        sentences, concept_weights = read_sentences(topic_id)
+        concept_weights = remove_rare_concepts(concept_weights)
+        concepts = sorted(concept_weights.keys())
 
-    # Implement ILP model
+        # Build occurence matrix
+        occurence = build_occurence_matrix(concepts, sentences)
 
-    model = LpProblem(name="content-selector", sense=LpMaximize)
+        # Implement ILP model
 
-    # Define the decision variables
+        model = LpProblem(name="content-selector", sense=LpMaximize)
 
-    s = {j: LpVariable(name=f"s{j}", cat="Binary") for j in range(0, len(sentences))}
-    c = {i: LpVariable(name=f"c{i}", cat="Binary") for i in range(0, len(concepts))}
+        # Define the decision variables
 
-    # Add constraints
+        s = {j: LpVariable(name=f"s{j}", cat="Binary") for j in range(0, len(sentences))}
+        c = {i: LpVariable(name=f"c{i}", cat="Binary") for i in range(0, len(concepts))}
 
-    length_constraint = []
-    for j, sentence in enumerate(sentences):
-        length_constraint.append(len(sentence["text"].strip().split()) * s[j])
-    model += (lpSum(length_constraint) <= max_length, "length_constraint")
+        # Add constraints
 
-    for i, concept in enumerate(concepts):
-        coverage_constraint_1 = []
-
+        length_constraint = []
         for j, sentence in enumerate(sentences):
-            coverage_constraint_1.append(s[j] * occurence[(i, j)])
-            model += (s[j] * occurence[(i, j)] <= c[i], f"c{i}_in_s{j}_constraint")
+            length_constraint.append(len(sentence["text"].strip().split()) * s[j])
+        model += (lpSum(length_constraint) <= max_length, "length_constraint")
 
-        model += (lpSum(coverage_constraint_1) >= c[i], f"c{i}_in_at_least_one_s_constraint")
+        for i, concept in enumerate(concepts):
+            coverage_constraint_1 = []
 
-    # Set the objective function
-    objective_function = []
-    for i, concept in enumerate(concepts):
-        objective_function.append(concept_weights[concept] * c[i])
-    model += lpSum(objective_function)
+            for j, sentence in enumerate(sentences):
+                coverage_constraint_1.append(s[j] * occurence[(i, j)])
+                model += (s[j] * occurence[(i, j)] <= c[i], f"c{i}_in_s{j}_constraint")
 
-    status = model.solve(solver=GLPK(msg=False))
+            model += (lpSum(coverage_constraint_1) >= c[i], f"c{i}_in_at_least_one_s_constraint")
 
-    sentences_in_summary = []
-    for var in s.values():
-        if var.value() == 1:
-            sentences_in_summary.append(int(var.name[1:]))
+        # Set the objective function
+        objective_function = []
+        for i, concept in enumerate(concepts):
+            objective_function.append(concept_weights[concept] * c[i])
+        model += lpSum(objective_function)
 
-    for idx in sorted(sentences_in_summary):
-        print(sentences[idx]["text"])
+        status = model.solve(solver=GLPK(msg=False))
 
+        sentences_in_summary = []
+        for var in s.values():
+            if var.value() == 1:
+                sentences_in_summary.append(int(var.name[1:]))
 
+        print(topic_id)
+        for idx in sorted(sentences_in_summary):
+            print(sentences[idx]["text"])
 
-
-
-
-
-
-
-
-
-
-    # print("")
+        print("\n")
