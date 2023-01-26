@@ -5,6 +5,7 @@ from os import listdir
 from os.path import isfile, join, isdir
 from nltk.corpus import stopwords
 import nltk
+import export_summary
 from nltk.tokenize import RegexpTokenizer
 from pulp import GLPK
 from itertools import zip_longest
@@ -204,15 +205,9 @@ if __name__ == '__main__':
         sentences_in_summary = []
         for var in s.values():
             if var.value() == 1:
-                sentences_in_summary.append(int(var.name[1:]))
-
-
+                sentences_in_summary.append(sentences[int(var.name[1:])]["text"])
 
         # Print to file
-        # TODO - import print to file module
-        # temporary print below
-        print(topic_id)
-        for idx in sorted(sentences_in_summary):
-            print(sentences[idx]["text"])
+        export_summary.export_summary(sentences_in_summary, topic_id, "2", "../outputs/D3")
 
-        print("\n")
+        
