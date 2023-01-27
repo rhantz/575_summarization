@@ -1,19 +1,20 @@
 from pulp import LpMaximize, LpProblem, LpVariable, lpSum
 from nltk.stem.snowball import SnowballStemmer
+from nltk.tokenize import RegexpTokenizer
 from nltk.util import bigrams
-from os import listdir
-from os.path import isfile, join, isdir
 from nltk.corpus import stopwords
 import nltk
-import export_summary
-from nltk.tokenize import RegexpTokenizer
+import sys
+from os import listdir
+from os.path import isfile, join
 from pulp import GLPK
 from itertools import zip_longest
 from collections import Counter
+import export_summary
 nltk.download('stopwords')
 
 
-def remove_rare_concepts(concepts: Counter):
+def remove_rare_concepts(concepts: Counter) -> Counter:
     """
     Removes concepts that occur in less than 3 documents
     Args:
@@ -97,7 +98,7 @@ def process_article(article_text: str) -> tuple:
     return sents, concepts
 
 
-def read_sentences(topic_id: str, order_sents: bool = True):
+def read_sentences(topic_id: str, order_sents: bool = True) -> tuple:
     """
     Reads each sentence available for a single topic id
     Args:
@@ -147,9 +148,9 @@ if __name__ == '__main__':
     # max length (number of whitespace delimited tokens) in each summary
     max_length = 100
 
-    # TODO - choose directory via command line? (training, evaltest, devtest)
+    input_directory = sys.argv[1]
 
-    directory = "../outputs/devtest/"
+    directory = f"../outputs/{input_directory}/"
     topic_ids = [d for d in listdir(directory) if not isfile(join(directory, d))]
 
     for topic_id in topic_ids:
@@ -160,8 +161,6 @@ if __name__ == '__main__':
 
         # Builds occurence matrix
         occurence = build_occurence_matrix(concepts, sentences)
-
-
 
         # Implement ILP model
 
@@ -210,4 +209,4 @@ if __name__ == '__main__':
         # Print to file
         export_summary.export_summary(sentences_in_summary, topic_id, "2", "../outputs/D3")
 
-        
+
