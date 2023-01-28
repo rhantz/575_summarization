@@ -5,6 +5,7 @@ from os.path import isfile, join
 from nltk.corpus import stopwords
 from nltk import sent_tokenize, word_tokenize
 import pandas as pd
+import export_summary
 
 # Function to read in an article and return it as a single string
 def read_article(file_path):
@@ -33,16 +34,16 @@ def sent_score(doc_num, sent, tfidf_dic ):
 
 if __name__ == '__main__':
 
-    directory = "/Users/tashi/Desktop/Ling575/575_summarization/outputs/devtest"
+    directory = "../outputs/devtest"
     topic_ids = sorted([d for d in listdir(directory) if not isfile(join(directory, d))])
     total_top = len(topic_ids)
     all_set = []
     for topic_id in sorted(topic_ids):
         one_set = []
-        topic_directory = f"/Users/tashi/Desktop/Ling575/575_summarization/outputs/devtest/{topic_id}"
+        topic_directory = f"../outputs/devtest/{topic_id}"
         articles = sorted([f for f in listdir(topic_directory) if isfile(join(topic_directory, f))])
         for name in articles:
-            article_string = read_article(f"/Users/tashi/Desktop/Ling575/575_summarization/outputs/devtest/{topic_id}/{name}")
+            article_string = read_article(f"../outputs/devtest/{topic_id}/{name}")
             one_set.append(article_string)
             one_set_string = " ".join(one_set)
         all_set.append(one_set_string)
@@ -129,3 +130,6 @@ if __name__ == '__main__':
                     else:
                         break
         summary.append(my_tuple)
+
+    for top_id, sent in summary:
+        export_summary.export_summary(sent, top_id, "1", "../outputs/D3")
