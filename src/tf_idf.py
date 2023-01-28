@@ -93,7 +93,7 @@ if __name__ == '__main__':
     summary = []
     # select sentences with high tfidf scores 
     for top_num in range(0, total_set):
-        my_tuple = (top_num, [])
+        my_tuple = (topic_ids[top_num], [])
         w_c = 0
         
         # iterate through dataframe where Doc_set = top_num, so that we are only selecting sentences in the same doc_set
@@ -129,6 +129,3 @@ if __name__ == '__main__':
                     else:
                         break
         summary.append(my_tuple)
-
-    for i in summary:
-        print (i)       
