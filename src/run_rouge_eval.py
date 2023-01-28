@@ -1,3 +1,17 @@
+"""
+Module for evaluating the summarization system with the ROUGE metrics
+
+To run this evaluation scipt, execute:
+    python3 run_rouge_eval.py --summary_path path_to_summaries --model_path path_to_model_files
+    --rouge_methods methods(separated with ',') --eval_output_path diectory_storing_eval_output
+    --eval_output_filename output_filename
+
+* All flags are required
+* An example of the passing arguments to the  --rouge_methods flag:
+    --rouge_methods rouge1,rouge2
+
+"""
+
 import os
 import argparse
 from sys import argv
@@ -77,18 +91,29 @@ def load_data(file_path: str) -> str:
 
 def evaluate_results(summary_dict: dict, model_dict: dict):
     """
-    TO DO: check
     Run system evaluation on ROUGE metrics
     
     Parameters
     ----------
+    summary_dict: dict (defaultdict)
+        a dict storing the summary file names
+        * Format: {"summary_method_id_1": [file1, file2, ...],
+                   "summary_method_id_2": [file7, file10, ...]}
+    model_dict: dict
+        a dict storing the eval id and the corresponding models
+        * Format: {"eval_id_1": [model1, model2, ...], "eval_id_2": [model5, model6, ...]}
+    
+    Returns
+    -------
+    Nothing is returned
+
     """
     rouge_methods = args.rouge_methods
     for summary_method_id, summary_files in summary_dict.items():
         for summary_file in summary_files:
             model_eval_id = summary_file[:-2]
             summary = load_data(args.summary_path + "/" + summary_file)
-            summary_rouge_scores = defaultdict(lambda: defaultdict(list)) # before taking the average
+            summary_rouge_scores = defaultdict(lambda: defaultdict(list)) # store the results of the current summary file before taking the average (scores evaluated on different model files)
             for model_file in model_dict[model_eval_id]:
                 model = load_data(args.model_path + "/" + model_file)
                 scorer = rouge_scorer.RougeScorer(rouge_methods, use_stemmer=True)
@@ -100,9 +125,6 @@ def evaluate_results(summary_dict: dict, model_dict: dict):
                     summary_rouge_scores[rouge_method]["R"].append(recall)
                     summary_rouge_scores[rouge_method]["F"].append(fmeasure)
             
-            avg_p = 0
-            avg_r = 0
-            avg_f = 0
             for rouge_method, score_type_results in summary_rouge_scores.items():
                 summary_all_p = score_type_results["P"]
                 summary_all_r = score_type_results["R"]
@@ -119,11 +141,47 @@ def evaluate_results(summary_dict: dict, model_dict: dict):
                 total_results[summary_method_id][rouge_method]["R"].append(avg_r)
                 total_results[summary_method_id][rouge_method]["F"].append(avg_f)
 
-
     return
 
 def output_eval_results():
+    """
+    Print out the evaluation results to a file
+    
+    Parameters
+    ----------
+    No parameters
 
+    Returns
+    -------
+    Nothing is returned
+    
+    """
+
+    eval_output = ""
+    for summary_method_id, all_rouge_scores in total_results.items():
+        for rouge_score_type, rouge_scores in all_rouge_scores.items():
+            # get average of all summaries
+            total_avg_r = round(sum(rouge_scores["R"])/len(rouge_scores["R"]), 5)
+            total_avg_p = round(sum(rouge_scores["P"])/len(rouge_scores["P"]), 5)
+            total_avg_f = round(sum(rouge_scores["F"])/len(rouge_scores["F"]), 5)
+
+            # get eval output content
+            eval_output += "---------------------------------------------\n"
+            eval_output += "%s ROUGE-%s Average_R: %.5f\n"%(summary_method_id, rouge_score_type[-1], total_avg_r)
+            eval_output += "%s ROUGE-%s Average_P: %.5f\n"%(summary_method_id, rouge_score_type[-1], total_avg_p)
+            eval_output += "%s ROUGE-%s Average_F: %.5f\n"%(summary_method_id, rouge_score_type[-1], total_avg_f)
+            eval_output += ".............................................\n"
+
+            for summary_filename, summary_results in individual_results[summary_method_id][rouge_score_type].items():
+                eval_output += "%s ROUGE-%s Eval %s R:%.5f P:%.5f F:%.5f\n"%(summary_method_id, rouge_score_type[-1], summary_filename, summary_results["R"], summary_results["P"], summary_results["F"])
+    
+    # check if directory exists, if not, create one
+    if not os.path.exists(args.eval_output_path):
+        os.makedirs(args.eval_output_path)
+    
+    # output summary
+    with open(os.path.join(args.eval_output_path, args.eval_output_filename), "w") as f:
+        f.write(eval_output)
 
     return
 
@@ -132,46 +190,29 @@ def output_eval_results():
 
 if __name__ == "__main__":
 
-    # parser = argparse.ArgumentParser(
-    #     description="Run ROUGE evaluation metrics for summarization system.")
+    parser = argparse.ArgumentParser(
+        description="Run ROUGE evaluation metrics for summarization system.")
     
-    # parser.add_argument(
-    #     "--summary_path", type=str, required=True, help="path to summmarization system outputs")
-    # parser.add_argument(
-    #     "--model_path", type=str, required=True, help="path to models (gold standard)")
-    # parser.add_argument(
-    #     "--rouge_methods", required=True, help="ROUGE methods used for evaluation (separated with comma)", 
-    #     type=lambda s: [item for item in s.split(',')])
-    # parser.add_argument(
-    #     "--eval_output_path", type=str, required=True, help="path to evaluation output")
+    parser.add_argument(
+        "--summary_path", type=str, required=True, help="path to summmarization system outputs")
+    parser.add_argument(
+        "--model_path", type=str, required=True, help="path to models (gold standard)")
+    parser.add_argument(
+        "--rouge_methods", required=True, help="ROUGE methods used for evaluation (separated with comma)", 
+        type=lambda s: [item for item in s.split(',')])
+    parser.add_argument(
+        "--eval_output_path", type=str, required=True, help="path to evaluation output")
+    parser.add_argument(
+        "--eval_output_filename", type=str, required=True, help="filename of evaluation output")
     
-    # args = parser.parse_args(argv[1:])
+    args = parser.parse_args(argv[1:])
     
-    # print(args.summary_path)
-    # print(args.rouge_methods)
+    # organize data into format that can be easily used
+    summary_dict = collect_summaries(args.summary_path)
+    model_dict = collect_models(args.model_path)
 
+    # run evaluation metrics
+    evaluate_results(summary_dict, model_dict)
 
-
-
-
-
-
-    summary_path = "../test/summaries"
-    model_path = "../test/models"
-
-    # summary_dict = collect_summaries(summary_path)
-    # model_dict = collect_models(model_path)
-
-    # print(summary_dict)
-    # print()
-    # print(model_dict)
-
-    summary = load_data("../test/summaries/D1001-A.M.100.A.1")
-    model = load_data("../test/models/D1001-A.M.100.A.H")
-    scorer = rouge_scorer.RougeScorer(['rouge1'], use_stemmer=True)
-    # scores = scorer.score('The quick brown fox jumps over the lazy dog',
-    #                       'The quick brown dog jumps on the log.')
-    scores = scorer.score(model, summary)
-
-    print(scores)
-    # print(load_data("../test/summaries/D1001-A.M.100.A.1"))
+    # print out results to a file
+    output_eval_results()
