@@ -9,7 +9,7 @@ python3 proc_docset.py
 
 # Summarization - tf-idf
 echo "Generating summaries with [tf-idf]"
-
+python3 tf_idf.py
 
 # Summarizarion - ILP
 echo "Generating summaries with [ILP]"
