@@ -85,8 +85,12 @@ def load_data(file_path: str) -> str:
         the data of the specified file
 
     """
-    with open(file_path, 'r', encoding = "utf8") as f:
-        content = f.read()
+    try:
+        with open(file_path, 'r', encoding = "utf8") as f:
+            content = f.read()
+    except UnicodeDecodeError:
+        with open(file_path, 'r', encoding = "cp1252") as f:
+            content = f.read()
     return content
 
 def evaluate_results(summary_dict: dict, model_dict: dict):

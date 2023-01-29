@@ -19,7 +19,7 @@ def export_summary(lines, topic_id, method, output_path):
         os.makedirs(output_path)
     
     # output summary
-    with open(os.path.join(output_path, output_filename), "w") as f:
+    with open(os.path.join(output_path, output_filename), "w", encoding = "utf8") as f:
         f.write(content)
 
     return
