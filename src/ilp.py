@@ -152,7 +152,7 @@ if __name__ == '__main__':
 
     directory = f"../outputs/{input_directory}/"
     topic_ids = [d for d in listdir(directory) if not isfile(join(directory, d))]
-
+    
     for topic_id in topic_ids:
 
         sentences, concept_weights = read_sentences(topic_id)
@@ -207,6 +207,6 @@ if __name__ == '__main__':
                 sentences_in_summary.append(sentences[int(var.name[1:])]["text"])
 
         # Print to file
-        export_summary.export_summary(sentences_in_summary, topic_id, "2", "../outputs/D3")
+        export_summary.export_summary(sentences_in_summary, topic_id[:6], "2", "../outputs/D3")
 
 
