@@ -12,27 +12,17 @@ import export_summary
 def read_article(file_path):
 
     with open(file_path, 'r') as file:
-        article_string = file.read()
-    return article_string
+        return file.read()
 
-def sent_score(doc_num, sent, tfidf_dic ):
-#     Purpose: To calc the tfidf score for each sentence 
-#     Input: [doc_num]: index of the doc_set that the sentence is in
-#            [sent]: a word_tokenized 
-#            [tfidf_dic]: a dictionary with each word and their coresponding tfidf score
-#     Output: The tfidf score of the sentence (taking average)
-    score = 0
-    word_num = 0
-    for word in sent:
-        if word in tfidf_dic:
-            word_num += 1
-            score += tfidf_dic[word][doc_num]
-    if word_num > 0:
-        return (score/word_num) 
-    else:
-        return 0
+def sent_score(doc_num, sent, tfidf_dic):
+    # #     Purpose: To calc the tfidf score for each sentence 
+    # #     Input: [doc_num]: index of the doc_set that the sentence is in
+    # #            [sent]: a word_tokenized 
+    # #            [tfidf_dic]: a dictionary with each word and their coresponding tfidf score
+    # #     Output: The tfidf score of the sentence (taking average)
+    word_scores = [tfidf_dic[word][doc_num] for word in sent if word in tfidf_dic]
+    return sum(word_scores) / len(word_scores) if word_scores else 0
 
-        
 
 if __name__ == '__main__':
 
@@ -118,7 +108,7 @@ if __name__ == '__main__':
         for index, row in df.loc[df['Doc_set'] == top_num].iterrows():
 
             # filter out sentence with less than 8 words 
-            if row[2] < 8:
+            if row[2] < 10:
                 pass
 
             else:
@@ -136,16 +126,15 @@ if __name__ == '__main__':
                     v_selected = vectorizer.transform([sent])
                     total_cos_simi += cosine_similarity(v_curr, v_selected)
                 avg_cos_simi = total_cos_simi / len(my_tuple[1])
-                if  avg_cos_simi > 0.2:
+                if  avg_cos_simi > 0.4:
                     continue
-                else:
                     # make sure summary does not exceed 100 words limit
-                    if w_c + row[2] < 100:
-                        single_string = row[1].strip('\n')
-                        my_tuple[1].append(single_string)
-                        w_c += row[3]
-                    else:
-                        break
+                if w_c + row[2] < 100:
+                    single_string = row[1].strip('\n')
+                    my_tuple[1].append(single_string)
+                    w_c += row[3]
+                else:
+                    break
         summary.append(my_tuple)
 
     for top_id, sent in summary:
