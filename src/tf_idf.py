@@ -31,7 +31,8 @@ def sent_score(doc_num, sent, tfidf_dic ):
         return (score/word_num) 
     else:
         return 0
-    
+
+        
 
 if __name__ == '__main__':
 

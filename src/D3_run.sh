@@ -23,4 +23,3 @@ python3 run_rouge_eval.py \
     --rouge_methods rouge1,rouge2 \
     --eval_output_path ../results/D3/ \
     --eval_output_filename rouge_scores.out
-
