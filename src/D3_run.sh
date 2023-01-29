@@ -9,7 +9,7 @@ python3 proc_docset.py
 
 # Summarization - tf-idf
 echo "Generating summaries with [tf-idf]"
-python3 tf_idf.py
+python3 tf_idf.py 0.3 15
 
 # Summarizarion - ILP
 echo "Generating summaries with [ILP]"
@@ -23,3 +23,4 @@ python3 run_rouge_eval.py \
     --rouge_methods rouge1,rouge2 \
     --eval_output_path ../results/D3/ \
     --eval_output_filename rouge_scores.out
+
