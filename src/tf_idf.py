@@ -6,7 +6,8 @@ from nltk.corpus import stopwords
 from nltk import sent_tokenize, word_tokenize
 import pandas as pd
 import export_summary
-# import string
+import sys
+import string
 
 # Function to read in an article and return it as a single string
 def read_article(file_path):
@@ -15,14 +16,21 @@ def read_article(file_path):
         return file.read()
 
 def sent_score(doc_num, sent, tfidf_dic):
-    # #     Purpose: To calc the tfidf score for each sentence 
-    # #     Input: [doc_num]: index of the doc_set that the sentence is in
-    # #            [sent]: a word_tokenized 
-    # #            [tfidf_dic]: a dictionary with each word and their coresponding tfidf score
-    # #     Output: The tfidf score of the sentence (taking average)
-    word_scores = [tfidf_dic[word][doc_num] for word in sent if word in tfidf_dic]
-    return sum(word_scores) / len(word_scores) if word_scores else 0
-
+#     Purpose: To calc the tfidf score for each sentence 
+#     Input: [doc_num]: index of the doc_set that the sentence is in
+#            [sent]: a word_tokenized 
+#            [tfidf_dic]: a dictionary with each word and their coresponding tfidf score
+#     Output: The tfidf score of the sentence (taking average)
+    score = 0
+    word_num = 0
+    for word in sent:
+        if word.lower() in tfidf_dic:
+            word_num += 1
+            score += tfidf_dic[word.lower()][doc_num]
+    if word_num > 0:
+        return (score/word_num) 
+    else:
+        return 0
 
 if __name__ == '__main__':
 
@@ -72,7 +80,7 @@ if __name__ == '__main__':
             filtered_text = " ".join(filtered_lines)
             tokens = word_tokenize(filtered_text)
 
-            # # filter out punctuation so when we count word, punctuation is excluded
+            # filter out punctuation so when we count word, punctuation is excluded
             # filtered_token = [word for word in filtered_text if word not in string.punctuation]
             # filtered_token = word_tokenize(''.join(filtered_token))
 
@@ -97,6 +105,8 @@ if __name__ == '__main__':
 
     # print(df.to_string())    
 
+    cosine_sim = float(sys.argv[1])
+    word_co = int(sys.argv[2])
     total_set = iindex + 1
     summary = []
     # select sentences with high tfidf scores 
@@ -108,7 +118,7 @@ if __name__ == '__main__':
         for index, row in df.loc[df['Doc_set'] == top_num].iterrows():
 
             # filter out sentence with less than 8 words 
-            if row[2] < 10:
+            if row[2] < word_co:
                 pass
 
             else:
@@ -126,8 +136,9 @@ if __name__ == '__main__':
                     v_selected = vectorizer.transform([sent])
                     total_cos_simi += cosine_similarity(v_curr, v_selected)
                 avg_cos_simi = total_cos_simi / len(my_tuple[1])
-                if  avg_cos_simi > 0.4:
+                if  avg_cos_simi > cosine_sim:
                     continue
+                # else:
                     # make sure summary does not exceed 100 words limit
                 if w_c + row[2] < 100:
                     single_string = row[1].strip('\n')
@@ -137,5 +148,6 @@ if __name__ == '__main__':
                     break
         summary.append(my_tuple)
 
+    # export the result
     for top_id, sent in summary:
         export_summary.export_summary(sent, top_id[:6], "1", "../outputs/D3")
