@@ -8,6 +8,9 @@ import pandas as pd
 import export_summary
 import sys
 import string
+import nltk
+nltk.download('stopwords')
+
 
 # Function to read in an article and return it as a single string
 def read_article(file_path):
