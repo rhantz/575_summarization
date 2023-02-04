@@ -1,7 +1,7 @@
 from pulp import LpMaximize, LpProblem, LpVariable, lpSum
 from nltk.stem.snowball import SnowballStemmer
 from nltk.tokenize import RegexpTokenizer
-from nltk.util import bigrams
+from nltk.util import bigrams, skipgrams
 from nltk.corpus import stopwords
 import nltk
 import sys
@@ -11,6 +11,7 @@ from pulp import GLPK
 from itertools import zip_longest
 from collections import Counter
 import export_summary
+
 nltk.download('stopwords')
 
 
@@ -62,8 +63,26 @@ def get_sentence_concepts(sent: str) -> set:
         sent_concepts: set of bigram concepts {(unigram, unigram)}
 
     """
-    sent_stemmed = [stemmer.stem(word) for word in tokenizer.tokenize(sent)]
-    sent_concepts = {bigram for bigram in bigrams(sent_stemmed) if bigram[0] not in stop_words and bigram[1] not in stop_words}
+    if punctuation:
+        sent_stemmed = [stemmer.stem(word) for word in sent.strip().split(" ")]
+    else:
+        sent_stemmed = [stemmer.stem(word) for word in tokenizer.tokenize(sent)]
+
+    if remove_stop_words:
+        sent_stemmed = [word for word in sent_stemmed if word not in stop_words]
+
+    # stop words are always removed for unigrams
+    if concept_type == "unigrams":
+        sent_concepts = {unigram for unigram in sent_stemmed if unigram not in stop_words}
+
+    # for bigrams and skipgrams, only 1 stop word is allowed (unless stop words are fully removed)
+    elif concept_type == "bigrams":
+        sent_concepts = {bigram for bigram in bigrams(sent_stemmed) if (bigram[0] not in stop_words) or (bigram[1] not in stop_words)}
+    elif concept_type == "skipgrams":
+        sent_concepts = {skipgram for skipgram in skipgrams(sent_stemmed, 2, 2) if (skipgram[0] not in stop_words) or (skipgram[1] not in stop_words)}
+    else:
+        raise ValueError(
+            f"{concept_type} is not a valid format of concept, please select 'unigrams', 'bigrams', or 'skipgrams'")
     return sent_concepts
 
 
@@ -134,6 +153,8 @@ def read_sentences(topic_id: str, order_sents: bool = True) -> tuple:
         # e.g [sentence 1 article 1, sentence 1 article 2, ... , last sentence last article]
         all_sents = [sent for sentences in zip_longest(*all_sents) for sent in sentences if sent is not None]
 
+    all_sents = [sent for sent in all_sents if len(sent["text"].strip().split()) >= min_sent_length]
+
     return all_sents, concept_weights
 
 
@@ -149,10 +170,14 @@ if __name__ == '__main__':
     max_length = 100
 
     input_directory = sys.argv[1]
+    concept_type = sys.argv[2]
+    punctuation = sys.argv[3] in ["True"]
+    min_sent_length = int(sys.argv[4])
+    remove_stop_words = sys.argv[5] in ["True"]
 
     directory = f"../outputs/{input_directory}/"
     topic_ids = [d for d in listdir(directory) if not isfile(join(directory, d))]
-    
+
     for topic_id in topic_ids:
 
         sentences, concept_weights = read_sentences(topic_id)
@@ -208,5 +233,3 @@ if __name__ == '__main__':
 
         # Print to file
         export_summary.export_summary(sentences_in_summary, topic_id[:6], "2", "../outputs/D3")
-
-
