@@ -1,9 +1,9 @@
 from pulp import LpMaximize, LpProblem, LpVariable, lpSum
+import nltk
 from nltk.stem.snowball import SnowballStemmer
 from nltk.tokenize import RegexpTokenizer
 from nltk.util import bigrams, skipgrams
 from nltk.corpus import stopwords
-import nltk
 import sys
 from os import listdir
 from os.path import isfile, join
@@ -11,8 +11,23 @@ from pulp import GLPK
 from itertools import zip_longest
 from collections import Counter
 import export_summary
+import argparse
 
 nltk.download('stopwords')
+
+
+# def get_similarity(sents):
+#     similarity_matrix = {}
+#     for i in range(len(sents) - 1):
+#         s_1_vec = vectorize(sents[i]["text"])
+#         for j in range(i + 1, len(sents)):
+#             s_2_vec = vectorize(sents[j]["text"])
+#             similarity_matrix[(i, j)] = cosine_similarity(s_1_vec, s_2_vec)
+#     return similarity_matrix
+#
+#
+# def cosine_similarity(s_1, s_2):
+#     return sim(s_1, s_2)
 
 
 def remove_rare_concepts(concepts: Counter) -> Counter:
@@ -20,7 +35,7 @@ def remove_rare_concepts(concepts: Counter) -> Counter:
     Removes concepts that occur in less than 3 documents
     Args:
         concepts: Counter for occurence of concept in each document
-         format - {(unigram, unigram): number of documents}
+         format - {concept: number of documents}
 
     Returns:
         Counter with only concepts that occur in 3 or more documents
@@ -34,7 +49,7 @@ def build_occurence_matrix(concepts: list, sentences: dict) -> dict:
         {(i, j) : [0, 1]}
 
     Args:
-        concepts: list of concepts [(unigram, unigram)]
+        concepts: list of concepts
         sentences: dictionary holding sentences {"text": full sentence, "concepts": set of concepts in sentence}
 
     Returns:
@@ -53,36 +68,35 @@ def build_occurence_matrix(concepts: list, sentences: dict) -> dict:
 
 def get_sentence_concepts(sent: str) -> set:
     """
-    For each sentence: stems, removes punctuation, splits into bigrams, and retains only bigrams that aren't
-    stop words only as concepts.
+    For each sentence: stems and returns set of desired concepts
 
     Args:
         sent: string sentence
 
     Returns:
-        sent_concepts: set of bigram concepts {(unigram, unigram)}
+        sent_concepts: set of desired concepts
 
     """
-    if punctuation:
-        sent_stemmed = [stemmer.stem(word) for word in sent.strip().split(" ")]
-    else:
+    if args.remove_punctuation:
         sent_stemmed = [stemmer.stem(word) for word in tokenizer.tokenize(sent)]
+    else:
+        sent_stemmed = [stemmer.stem(word) for word in sent.strip().split(" ")]
 
-    if remove_stop_words:
+    if args.remove_stop_words:
         sent_stemmed = [word for word in sent_stemmed if word not in stop_words]
 
     # stop words are always removed for unigrams
-    if concept_type == "unigrams":
+    if args.concept_type == "unigrams":
         sent_concepts = {unigram for unigram in sent_stemmed if unigram not in stop_words}
 
     # for bigrams and skipgrams, only 1 stop word is allowed (unless stop words are fully removed)
-    elif concept_type == "bigrams":
+    elif args.concept_type == "bigrams":
         sent_concepts = {bigram for bigram in bigrams(sent_stemmed) if (bigram[0] not in stop_words) or (bigram[1] not in stop_words)}
-    elif concept_type == "skipgrams":
-        sent_concepts = {skipgram for skipgram in skipgrams(sent_stemmed, 2, 2) if (skipgram[0] not in stop_words) or (skipgram[1] not in stop_words)}
+    elif args.concept_type == "skipgrams":
+        sent_concepts = {skipgram for skipgram in skipgrams(sent_stemmed, 2, args.skipgram_degree) if (skipgram[0] not in stop_words) or (skipgram[1] not in stop_words)}
     else:
         raise ValueError(
-            f"{concept_type} is not a valid format of concept, please select 'unigrams', 'bigrams', or 'skipgrams'")
+            f"{args.concept_type} is not a valid format of concept, please select 'unigrams', 'bigrams', or 'skipgrams'")
     return sent_concepts
 
 
@@ -95,7 +109,7 @@ def process_article(article_text: str) -> tuple:
     Returns:
         sents: dictionary holding all sentences in article
             {"text": full sentence, "concepts": set of concepts in sentence}
-        concepts: set of all concepts {(unigram, unigram)} in article
+        concepts: set of all concepts in article
     """
     # Splits article into paragraphs
     paragraphs = article_text.strip().split("\n\n")
@@ -125,8 +139,8 @@ def read_sentences(topic_id: str, order_sents: bool = True) -> tuple:
         order_sents: option to perform information ordering on sentences (True by default)
 
     Returns:
-        all_sents: list of sentence dictionarys for each article
-        concepts: Counter of each concept (unigram, unigram) and their weight (number of articles present in)
+        all_sents: list of sentence dictionaries for each article
+        concepts: Counter of each concept and their weight (number of articles present in)
 
     """
 
@@ -153,8 +167,6 @@ def read_sentences(topic_id: str, order_sents: bool = True) -> tuple:
         # e.g [sentence 1 article 1, sentence 1 article 2, ... , last sentence last article]
         all_sents = [sent for sentences in zip_longest(*all_sents) for sent in sentences if sent is not None]
 
-    all_sents = [sent for sent in all_sents if len(sent["text"].strip().split()) >= min_sent_length]
-
     return all_sents, concept_weights
 
 
@@ -166,16 +178,30 @@ if __name__ == '__main__':
     tokenizer = RegexpTokenizer(r'\w+')
     # set of stop words
     stop_words = set(stopwords.words("english"))
-    # max length (number of whitespace delimited tokens) in each summary
+    # max length (number of whitespace delimited tokens) in each summary must be 100
     max_length = 100
 
-    input_directory = sys.argv[1]
-    concept_type = sys.argv[2]
-    punctuation = sys.argv[3] in ["True"]
-    min_sent_length = int(sys.argv[4])
-    remove_stop_words = sys.argv[5] in ["True"]
+    parser = argparse.ArgumentParser(
+        description="Run ILP method of content selection for summarization system.")
 
-    directory = f"../outputs/{input_directory}/"
+    parser.add_argument(
+        "--input_dir", type=str, required=True, help="input directory to preprocessed articles (training, devtest, evaltest)")
+    parser.add_argument(
+        "--concept_type", type=str, required=True, help="concept schema (unigrams, bigrams, skipgrams)")
+    parser.add_argument(
+        "--skipgram_degree", type=int, required=False, default=2, help="degree of skipgram (if unspecified, defaults to 2)")
+    parser.add_argument(
+        "--remove_punctuation", action="store_true", help="option to remove punctuation in concepts")
+    parser.add_argument(
+        "--remove_stop_words", action="store_true", help="option to remove stop words from concepts")
+    parser.add_argument(
+        "--min_sent_length", type=int, required=False, default=0, help="minimum length of selected sentences (if unspecified, defaults to 0)")
+    # parser.add_argument(
+    #     "--sim_threshold", type=float, required=False, default=0, help="threshold to stay below for sentence similarity")
+
+    args = parser.parse_args(sys.argv[1:])
+
+    directory = f"../outputs/{args.input_dir}/"
     topic_ids = [d for d in listdir(directory) if not isfile(join(directory, d))]
 
     for topic_id in topic_ids:
@@ -186,6 +212,12 @@ if __name__ == '__main__':
 
         # Builds occurence matrix
         occurence = build_occurence_matrix(concepts, sentences)
+
+        # TODO - get similarity matrix of sentences of form similarity[(s_k, s_l)] = cosine_similarity
+        # Need - sentence vectorizer
+        # Need - function to compute cosine similarity
+        # Build similarity matrix
+        # similarity = get_similarity(sentences)
 
         # Implement ILP model
 
@@ -201,8 +233,19 @@ if __name__ == '__main__':
         # Length Constraint: All sentences chosen do not exceed 100 tokens
         length_constraint = []
         for j, sentence in enumerate(sentences):
-            length_constraint.append(len(sentence["text"].strip().split()) * s[j])
-        model += (lpSum(length_constraint) <= max_length, "length_constraint")
+
+            # if args.sim_threshold != 0:
+            #     for k in range(j + 1, len(sentences)):
+            #         if j != k:
+            #             model += similarity[(j, k)] <= args.sim_threshold, f"s{j}_s{k}_similarity_constraint"
+
+            l = len(sentence["text"].strip().split())
+
+            if args.min_sent_length != 0:
+                model += (l * s[j] >= args.min_sent_length * s[j], f"s{j}_length_constraint")
+
+            length_constraint.append(l * s[j])
+        model += (lpSum(length_constraint) <= max_length, "overall_length_constraint")
 
         for i, concept in enumerate(concepts):
             # Coverage Constraint 1: If c_i is included, at least 1 sentence that has c_i is included
