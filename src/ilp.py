@@ -13,8 +13,7 @@ from collections import Counter
 import export_summary
 import argparse
 from sklearn.feature_extraction.text import TfidfVectorizer
-from cluster import get_themes, get_vectors
-from majority_order_by_clustering import order
+from cluster import get_themes, get_vectors, majority_order
 from collections import defaultdict
 
 nltk.download('stopwords')
@@ -169,7 +168,7 @@ def read_sentences(topic_id: str) -> tuple:
         concept_weights.update(article_concepts)
 
     if not args.majority_order:
-        # default Information Ordering - orders sentences by article date, then sentence position
+        # default Information Ordering - orders sentences sentence position, then article date
         # e.g [sentence_1_article_1, sentence_1_article_2, ... , last_sentence_last_article]
         all_sents = [sent for sentences in zip_longest(*all_sents) for sent in sentences if sent is not None]
     else:
@@ -215,7 +214,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--theme_redundancy", type=int, required=False, default=1, help="max times each theme can be selected from (if unspecified, defaults to 1)")
     parser.add_argument(
-        "--majority_order", action="store_true", help="option to sort sentences by majority_ordering (if unspecified, sorts sentences by article date and sentence position)")
+        "--majority_order", action="store_true", help="option to sort sentences by majority_ordering (if unspecified, sorts sentences by sentence position, then article date)")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -236,7 +235,7 @@ if __name__ == '__main__':
         # Builds concept_occurence matrix
         concept_occurence = build_concept_matrix(concepts, sentences)
 
-        if args.majority_order or args.num_themes != 0:
+        if args.num_themes != 0:
             # Retrieves sentence_vectors and themes
             sentence_vectors = get_vectors([sentence["text"] for sentence in sentences])
             themes = get_themes(num_themes=args.num_themes, sentence_vectors=sentence_vectors) + 1
@@ -314,15 +313,24 @@ if __name__ == '__main__':
                 if args.num_themes != 0:
                     themes_in_summary.append(themes[int(var.name[1:])])
 
-        for sentence in sentences_in_summary:
-            print(sentence)
-        print(themes_in_summary)
+        ###
+        # Information Ordering
+        ###
 
+        # performs majority ordering on sentences
         if args.majority_order:
-            sentences_in_summary = order(themes, themes_in_summary, article_lengths)
+
+            # orders themes
+            order_of_themes = majority_order(themes, themes_in_summary, article_lengths)
+
+            # orders sentences by order_of_themes
+            theme_to_sents = {}
+            for theme, sentence in zip(themes_in_summary, sentences_in_summary):
+                if theme in theme_to_sents:
+                    theme_to_sents[theme].append(sentence)
+                else:
+                    theme_to_sents[theme] = [sentence]
+            sentences_in_summary = list(chain.from_iterable([theme_to_sents[theme] for theme in order_of_themes]))
 
         #Prints selected sentences to file
         export_summary.export_summary(sentences_in_summary, topic_id[:6], "2", "../outputs/D3")
-
-        # TODO - rebase and import graph algo module :)
-
