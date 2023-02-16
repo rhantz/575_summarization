@@ -12,22 +12,19 @@ from itertools import zip_longest
 from collections import Counter
 import export_summary
 import argparse
+from sklearn.feature_extraction.text import TfidfVectorizer
+from cluster import get_themes
+from collections import defaultdict
 
 nltk.download('stopwords')
 
 
-# def get_similarity(sents):
-#     similarity_matrix = {}
-#     for i in range(len(sents) - 1):
-#         s_1_vec = vectorize(sents[i]["text"])
-#         for j in range(i + 1, len(sents)):
-#             s_2_vec = vectorize(sents[j]["text"])
-#             similarity_matrix[(i, j)] = cosine_similarity(s_1_vec, s_2_vec)
-#     return similarity_matrix
-#
-#
-# def cosine_similarity(s_1, s_2):
-#     return sim(s_1, s_2)
+# TODO - docstring
+def build_theme_matrix(themes):
+    theme_matrix = defaultdict(int)
+    for t, theme in enumerate(themes):
+        theme_matrix[(t, theme)] = 1
+    return theme_matrix
 
 
 def remove_rare_concepts(concepts: Counter) -> Counter:
@@ -67,6 +64,7 @@ def build_occurence_matrix(concepts: list, sentences: dict) -> dict:
 
 
 def get_sentence_concepts(sent: str) -> set:
+    #TODO - add NE?
     """
     For each sentence: stems and returns set of desired concepts
 
@@ -162,6 +160,8 @@ def read_sentences(topic_id: str, order_sents: bool = True) -> tuple:
 
     # By default performs Information Ordering heuristic
     # if order_sents == False, sentences are left in order of article
+    # TODO - add argument for this
+    # TODO - figure out shape for if True
     if order_sents:
         # Information Ordering - orders sentences by position in article then by article date
         # e.g [sentence 1 article 1, sentence 1 article 2, ... , last sentence last article]
@@ -172,6 +172,8 @@ def read_sentences(topic_id: str, order_sents: bool = True) -> tuple:
 
 if __name__ == '__main__':
 
+    # use TFiDF vectorizer to determine sentence theme
+    vectorizer = TfidfVectorizer()
     # Stems all but stop words
     stemmer = SnowballStemmer("english", ignore_stopwords=True)
     # tokenizes and removes punctuation (does not remove _ )
@@ -196,8 +198,8 @@ if __name__ == '__main__':
         "--remove_stop_words", action="store_true", help="option to remove stop words from concepts")
     parser.add_argument(
         "--min_sent_length", type=int, required=False, default=0, help="minimum length of selected sentences (if unspecified, defaults to 0)")
-    # parser.add_argument(
-    #     "--sim_threshold", type=float, required=False, default=0, help="threshold to stay below for sentence similarity")
+    parser.add_argument(
+        "--num_themes", type=int, required=False, default=0, help="Number of themes to cluster sentences into")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -213,11 +215,13 @@ if __name__ == '__main__':
         # Builds occurence matrix
         occurence = build_occurence_matrix(concepts, sentences)
 
-        # TODO - get similarity matrix of sentences of form similarity[(s_k, s_l)] = cosine_similarity
-        # Need - sentence vectorizer
-        # Need - function to compute cosine similarity
-        # Build similarity matrix
-        # similarity = get_similarity(sentences)
+        sentences_text = [sentence["text"] for sentence in sentences]
+        sentence_vectors = vectorizer.fit_transform(sentences_text).toarray()
+
+        themes = get_themes(num_themes=5, sentence_vectors=sentence_vectors) + 1
+
+        if args.num_themes != 0:
+            theme_occurence = build_theme_matrix(themes)
 
         # Implement ILP model
 
@@ -234,14 +238,10 @@ if __name__ == '__main__':
         length_constraint = []
         for j, sentence in enumerate(sentences):
 
-            # if args.sim_threshold != 0:
-            #     for k in range(j + 1, len(sentences)):
-            #         if j != k:
-            #             model += similarity[(j, k)] <= args.sim_threshold, f"s{j}_s{k}_similarity_constraint"
-
             l = len(sentence["text"].strip().split())
 
             if args.min_sent_length != 0:
+                # s_j Length Constraint: s_j is above the minimum sentence length
                 model += (l * s[j] >= args.min_sent_length * s[j], f"s{j}_length_constraint")
 
             length_constraint.append(l * s[j])
@@ -259,6 +259,15 @@ if __name__ == '__main__':
 
             model += (lpSum(coverage_constraint_1) >= c[i], f"c{i}_in_at_least_one_s_constraint")
 
+        if args.num_themes != 0:
+            for theme in set(themes):
+                # Theme Constraint: theme_t can only occur at most once in the selected sentences
+                # TODO - set a threshold for theme occurence?
+                theme_constraint = []
+                for j, sentence in enumerate(sentences):
+                    theme_constraint.append(s[j] * theme_occurence[(j, theme)])
+                model += (lpSum(theme_constraint) <= 1, f"theme_{theme}_constraint")
+
         # Objective Function: Maximize the weighted sum of each included c_i and their respective weight
         objective_function = []
         for i, concept in enumerate(concepts):
@@ -270,9 +279,14 @@ if __name__ == '__main__':
 
         # Collect the index (j) of each s_j that should be included (i.e. s_j = 1 in optimal solution)
         sentences_in_summary = []
+        themes_in_summary = []
         for var in s.values():
             if var.value() == 1:
                 sentences_in_summary.append(sentences[int(var.name[1:])]["text"])
+                themes_in_summary.append(themes[int(var.name[1:])])
 
         # Print to file
         export_summary.export_summary(sentences_in_summary, topic_id[:6], "2", "../outputs/D3")
+
+        # TODO - rebase and import graph algo module :)
+
