@@ -12,9 +12,9 @@ from itertools import zip_longest, chain
 from collections import Counter
 import export_summary
 import argparse
-from sklearn.feature_extraction.text import TfidfVectorizer
 from cluster import get_themes, get_vectors, majority_order
 from collections import defaultdict
+import spacy
 
 nltk.download('stopwords')
 
@@ -82,6 +82,11 @@ def get_sentence_concepts(sent: str) -> set:
         sent_concepts: set of desired concepts
 
     """
+    if args.concept_type == "named_entity":
+        doc = nlp(sent)
+        sent_concepts = set([entity.text.lower() for entity in doc.ents])
+        return sent_concepts
+
     if args.remove_punctuation:
         sent_stemmed = [stemmer.stem(word) for word in tokenizer.tokenize(sent)]
     else:
@@ -221,6 +226,9 @@ if __name__ == '__main__':
     if args.num_themes == 0 and args.majority_order:
         raise ValueError("to sort by majority order, you must specify a number of themes with the --num_themes parameter")
 
+    if args.concept_type == "named_entity":
+        nlp = spacy.load("en_core_web_sm", disable=["tagger", "parser", "attribute_ruler", "lemmatizer"])
+
     # iterates through each topic_id set of articles
     directory = f"../outputs/{args.input_dir}/"
     topic_ids = [d for d in listdir(directory) if not isfile(join(directory, d))]
@@ -332,5 +340,5 @@ if __name__ == '__main__':
                     theme_to_sents[theme] = [sentence]
             sentences_in_summary = list(chain.from_iterable([theme_to_sents[theme] for theme in order_of_themes]))
 
-        #Prints selected sentences to file
+        # Prints selected sentences to file
         export_summary.export_summary(sentences_in_summary, topic_id[:6], "2", "../outputs/D3")
