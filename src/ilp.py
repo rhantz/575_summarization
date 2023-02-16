@@ -8,19 +8,27 @@ import sys
 from os import listdir
 from os.path import isfile, join
 from pulp import GLPK
-from itertools import zip_longest
+from itertools import zip_longest, chain
 from collections import Counter
 import export_summary
 import argparse
 from sklearn.feature_extraction.text import TfidfVectorizer
-from cluster import get_themes
+from cluster import get_themes, get_vectors
+from majority_order_by_clustering import order
 from collections import defaultdict
 
 nltk.download('stopwords')
 
 
-# TODO - docstring
-def build_theme_matrix(themes):
+def build_theme_matrix(themes: list) -> defaultdict:
+    """
+    given a list of themes that correspond to sentences by index, builds theme_matrix
+    Args:
+        themes: list of themes (ints)
+
+    Returns: theme_matrix {(sentence_j, theme): occurrence} where occurrence is [0, 1]
+
+    """
     theme_matrix = defaultdict(int)
     for t, theme in enumerate(themes):
         theme_matrix[(t, theme)] = 1
@@ -40,7 +48,7 @@ def remove_rare_concepts(concepts: Counter) -> Counter:
     return Counter({concept: weight for concept, weight in concepts.items() if weight >= 3})
 
 
-def build_occurence_matrix(concepts: list, sentences: dict) -> dict:
+def build_concept_matrix(concepts: list, sentences: dict) -> dict:
     """
     builds tuple-indexed dictionary (O_ij) of whether concept_i appears in sentence_j
         {(i, j) : [0, 1]}
@@ -129,16 +137,16 @@ def process_article(article_text: str) -> tuple:
     return sents, concepts
 
 
-def read_sentences(topic_id: str, order_sents: bool = True) -> tuple:
+def read_sentences(topic_id: str) -> tuple:
     """
     Reads each sentence available for a single topic id
     Args:
         topic_id: topic id directing function to read from correct topic_directory
-        order_sents: option to perform information ordering on sentences (True by default)
 
     Returns:
         all_sents: list of sentence dictionaries for each article
         concepts: Counter of each concept and their weight (number of articles present in)
+        article_lengths: stores length (number of sentences) of each article for downstream ordering purposes
 
     """
 
@@ -149,40 +157,44 @@ def read_sentences(topic_id: str, order_sents: bool = True) -> tuple:
     articles = sorted(articles, key=lambda x: float(x[-13:]))
 
     all_sents = []
+    lengths = []
     concept_weights = Counter()
     for idx, article in enumerate(articles):
         article = open(join(topic_directory, article), "r").read()
         # Retrieves sentences dictionary and concepts for article
         sents, article_concepts = process_article(article)
         all_sents.append(sents)
+        lengths.append(len(sents))
         # update the weights of each concept by adding in current articles concepts to Counter
         concept_weights.update(article_concepts)
 
-    # By default performs Information Ordering heuristic
-    # if order_sents == False, sentences are left in order of article
-    # TODO - add argument for this
-    # TODO - figure out shape for if True
-    if order_sents:
-        # Information Ordering - orders sentences by position in article then by article date
-        # e.g [sentence 1 article 1, sentence 1 article 2, ... , last sentence last article]
+    if not args.majority_order:
+        # default Information Ordering - orders sentences by article date, then sentence position
+        # e.g [sentence_1_article_1, sentence_1_article_2, ... , last_sentence_last_article]
         all_sents = [sent for sentences in zip_longest(*all_sents) for sent in sentences if sent is not None]
+    else:
+        # keeps ordering by article date
+        all_sents = list(chain.from_iterable(all_sents))
 
-    return all_sents, concept_weights
+    return all_sents, concept_weights, lengths
 
 
 if __name__ == '__main__':
 
-    # use TFiDF vectorizer to determine sentence theme
-    vectorizer = TfidfVectorizer()
-    # Stems all but stop words
+    ###
+    # Collects all arguments
+    ###
+
+    # stems all but stop words
     stemmer = SnowballStemmer("english", ignore_stopwords=True)
     # tokenizes and removes punctuation (does not remove _ )
     tokenizer = RegexpTokenizer(r'\w+')
-    # set of stop words
+    # set of English stop words
     stop_words = set(stopwords.words("english"))
     # max length (number of whitespace delimited tokens) in each summary must be 100
     max_length = 100
 
+    # parses CLI arguments
     parser = argparse.ArgumentParser(
         description="Run ILP method of content selection for summarization system.")
 
@@ -199,93 +211,117 @@ if __name__ == '__main__':
     parser.add_argument(
         "--min_sent_length", type=int, required=False, default=0, help="minimum length of selected sentences (if unspecified, defaults to 0)")
     parser.add_argument(
-        "--num_themes", type=int, required=False, default=0, help="Number of themes to cluster sentences into")
+        "--num_themes", type=int, required=False, default=0, help="number of themes to cluster sentences into (if unspecified or 0, theme constraint not applied)")
+    parser.add_argument(
+        "--theme_redundancy", type=int, required=False, default=1, help="max times each theme can be selected from (if unspecified, defaults to 1)")
+    parser.add_argument(
+        "--majority_order", action="store_true", help="option to sort sentences by majority_ordering (if unspecified, sorts sentences by article date and sentence position)")
 
     args = parser.parse_args(sys.argv[1:])
 
+    if args.num_themes == 0 and args.majority_order:
+        raise ValueError("to sort by majority order, you must specify a number of themes with the --num_themes parameter")
+
+    # iterates through each topic_id set of articles
     directory = f"../outputs/{args.input_dir}/"
     topic_ids = [d for d in listdir(directory) if not isfile(join(directory, d))]
 
     for topic_id in topic_ids:
 
-        sentences, concept_weights = read_sentences(topic_id)
+        # Retrieves sentences, concepts, and concept_weights
+        sentences, concept_weights, article_lengths = read_sentences(topic_id)
         concept_weights = remove_rare_concepts(concept_weights)
         concepts = sorted(concept_weights.keys())
 
-        # Builds occurence matrix
-        occurence = build_occurence_matrix(concepts, sentences)
+        # Builds concept_occurence matrix
+        concept_occurence = build_concept_matrix(concepts, sentences)
 
-        sentences_text = [sentence["text"] for sentence in sentences]
-        sentence_vectors = vectorizer.fit_transform(sentences_text).toarray()
+        if args.majority_order or args.num_themes != 0:
+            # Retrieves sentence_vectors and themes
+            sentence_vectors = get_vectors([sentence["text"] for sentence in sentences])
+            themes = get_themes(num_themes=args.num_themes, sentence_vectors=sentence_vectors) + 1
 
-        themes = get_themes(num_themes=5, sentence_vectors=sentence_vectors) + 1
-
+        # Builds theme_occurence matrix
         if args.num_themes != 0:
             theme_occurence = build_theme_matrix(themes)
 
-        # Implement ILP model
+        ###
+        # Implements ILP model
+        ###
 
         model = LpProblem(name="content-selector", sense=LpMaximize)
 
-        # Define the decision variables
-
+        # Defines the decision variables
         s = {j: LpVariable(name=f"s{j}", cat="Binary") for j in range(0, len(sentences))}
         c = {i: LpVariable(name=f"c{i}", cat="Binary") for i in range(0, len(concepts))}
 
-        # Add constraints
+        # Adds constraints and objective function to optimize
 
-        # Length Constraint: All sentences chosen do not exceed 100 tokens
         length_constraint = []
         for j, sentence in enumerate(sentences):
 
+            # Retrieves length of each sentence
             l = len(sentence["text"].strip().split())
 
             if args.min_sent_length != 0:
+
                 # s_j Length Constraint: s_j is above the minimum sentence length
                 model += (l * s[j] >= args.min_sent_length * s[j], f"s{j}_length_constraint")
 
             length_constraint.append(l * s[j])
+
+        # Length Constraint: All sentences chosen do not exceed 100 tokens
         model += (lpSum(length_constraint) <= max_length, "overall_length_constraint")
 
         for i, concept in enumerate(concepts):
-            # Coverage Constraint 1: If c_i is included, at least 1 sentence that has c_i is included
             coverage_constraint_1 = []
 
             for j, sentence in enumerate(sentences):
-                coverage_constraint_1.append(s[j] * occurence[(i, j)])
+                coverage_constraint_1.append(s[j] * concept_occurence[(i, j)])
 
                 # Coverage Constraint 2: If s_j is included, so is c_i, if c_i in s_j
-                model += (s[j] * occurence[(i, j)] <= c[i], f"c{i}_in_s{j}_constraint")
+                model += (s[j] * concept_occurence[(i, j)] <= c[i], f"c{i}_in_s{j}_constraint")
 
+            # Coverage Constraint 1: If c_i is included, at least 1 sentence that has c_i is included
             model += (lpSum(coverage_constraint_1) >= c[i], f"c{i}_in_at_least_one_s_constraint")
 
         if args.num_themes != 0:
             for theme in set(themes):
-                # Theme Constraint: theme_t can only occur at most once in the selected sentences
-                # TODO - set a threshold for theme occurence?
                 theme_constraint = []
                 for j, sentence in enumerate(sentences):
                     theme_constraint.append(s[j] * theme_occurence[(j, theme)])
-                model += (lpSum(theme_constraint) <= 1, f"theme_{theme}_constraint")
 
-        # Objective Function: Maximize the weighted sum of each included c_i and their respective weight
+                # Theme Constraint: theme_t can only occur at most {args.theme_redundancy} time(s) in the selected sentences
+                model += (lpSum(theme_constraint) <= args.theme_redundancy, f"theme_{theme}_constraint")
+
         objective_function = []
         for i, concept in enumerate(concepts):
             objective_function.append(concept_weights[concept] * c[i])
+
+        # Objective Function: Maximizes the weighted sum of each included c_i and their respective weight
         model += lpSum(objective_function)
 
-        # Solve the model -- decide which s_j's should be included
+        # Solves the model -- decides which s_j's should be included
         status = model.solve(solver=GLPK(msg=False))
 
-        # Collect the index (j) of each s_j that should be included (i.e. s_j = 1 in optimal solution)
+        # Collects the index (j) of each s_j that should be included (i.e. s_j = 1) in optimal solution
         sentences_in_summary = []
+        # Collects the theme of each s_j that should be included in optimal solution
         themes_in_summary = []
         for var in s.values():
             if var.value() == 1:
                 sentences_in_summary.append(sentences[int(var.name[1:])]["text"])
-                themes_in_summary.append(themes[int(var.name[1:])])
+                if args.num_themes != 0:
+                    themes_in_summary.append(themes[int(var.name[1:])])
 
-        # Print to file
+        for sentence in sentences_in_summary:
+            print(sentence)
+        print(themes_in_summary)
+
+        if args.majority_order:
+            sentences_in_summary = order(themes, themes_in_summary, article_lengths)
+
+        #Prints selected sentences to file
         export_summary.export_summary(sentences_in_summary, topic_id[:6], "2", "../outputs/D3")
 
         # TODO - rebase and import graph algo module :)
