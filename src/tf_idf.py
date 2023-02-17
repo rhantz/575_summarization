@@ -19,15 +19,15 @@ def order_info(index,sents,do_order):
 #            [sent]: a sentence list
 #            [do_order]: optioin to perform information order or not
 #     Output: topic_ID and the summary (list)
+
+    pos = {}
+    for i in sents:
+        pos[int(i[1])/int(i[0])] = i[2]
     if do_order == "yes": 
-        pos = {}
-        for i in sents:
-            pos[int(i[1])/int(i[0])] = i[2]
-        
         sorted_pos = dict(sorted(pos.items()))
         pos_list=list(sorted_pos.values())
     else:
-        pos_list = sents
+        pos_list = list(pos.values())
 
 
     return(index,pos_list)
