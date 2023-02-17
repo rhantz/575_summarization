@@ -8,7 +8,7 @@ import sys
 from os import listdir
 from os.path import isfile, join
 from pulp import GLPK
-from itertools import zip_longest, chain
+from itertools import chain
 from collections import Counter
 import export_summary
 import argparse
@@ -172,13 +172,7 @@ def read_sentences(topic_id: str) -> tuple:
         # update the weights of each concept by adding in current articles concepts to Counter
         concept_weights.update(article_concepts)
 
-    if not args.majority_order:
-        # default Information Ordering - orders sentences sentence position, then article date
-        # e.g [sentence_1_article_1, sentence_1_article_2, ... , last_sentence_last_article]
-        all_sents = [sent for sentences in zip_longest(*all_sents) for sent in sentences if sent is not None]
-    else:
-        # keeps ordering by article date
-        all_sents = list(chain.from_iterable(all_sents))
+    all_sents = list(chain.from_iterable(all_sents))
 
     return all_sents, concept_weights, lengths
 
@@ -215,16 +209,20 @@ if __name__ == '__main__':
     parser.add_argument(
         "--min_sent_length", type=int, required=False, default=0, help="minimum length of selected sentences (if unspecified, defaults to 0)")
     parser.add_argument(
+        "--theme_constraint", action="store_true", help="option to apply theme constraint")
+    parser.add_argument(
         "--num_themes", type=int, required=False, default=0, help="number of themes to cluster sentences into (if unspecified or 0, theme constraint not applied)")
     parser.add_argument(
         "--theme_redundancy", type=int, required=False, default=1, help="max times each theme can be selected from (if unspecified, defaults to 1)")
     parser.add_argument(
-        "--majority_order", action="store_true", help="option to sort sentences by majority_ordering (if unspecified, sorts sentences by sentence position, then article date)")
+        "--majority_order", action="store_true", help="option to sort sentences by majority_ordering (if unspecified, sorts sentences by article date)")
+    parser.add_argument(
+        "--output_dir", type=str, required=True, help="output directory to print summary to")
 
     args = parser.parse_args(sys.argv[1:])
 
-    if args.num_themes == 0 and args.majority_order:
-        raise ValueError("to sort by majority order, you must specify a number of themes with the --num_themes parameter")
+    if args.num_themes == 0 and (args.majority_order or args.theme_constraint):
+        raise ValueError("to sort by majority order or apply the theme constraint, you must specify a nonzero number of themes with the --num_themes parameter")
 
     if args.concept_type == "named_entity":
         nlp = spacy.load("en_core_web_sm", disable=["tagger", "parser", "attribute_ruler", "lemmatizer"])
@@ -243,13 +241,13 @@ if __name__ == '__main__':
         # Builds concept_occurence matrix
         concept_occurence = build_concept_matrix(concepts, sentences)
 
-        if args.num_themes != 0:
+        if args.majority_order or args.theme_constraint:
             # Retrieves sentence_vectors and themes
             sentence_vectors = get_vectors([sentence["text"] for sentence in sentences])
             themes = get_themes(num_themes=args.num_themes, sentence_vectors=sentence_vectors) + 1
 
         # Builds theme_occurence matrix
-        if args.num_themes != 0:
+        if args.theme_constraint:
             theme_occurence = build_theme_matrix(themes)
 
         ###
@@ -292,7 +290,7 @@ if __name__ == '__main__':
             # Coverage Constraint 1: If c_i is included, at least 1 sentence that has c_i is included
             model += (lpSum(coverage_constraint_1) >= c[i], f"c{i}_in_at_least_one_s_constraint")
 
-        if args.num_themes != 0:
+        if args.theme_constraint:
             for theme in set(themes):
                 theme_constraint = []
                 for j, sentence in enumerate(sentences):
@@ -318,7 +316,7 @@ if __name__ == '__main__':
         for var in s.values():
             if var.value() == 1:
                 sentences_in_summary.append(sentences[int(var.name[1:])]["text"])
-                if args.num_themes != 0:
+                if args.majority_order or args.theme_constraint:
                     themes_in_summary.append(themes[int(var.name[1:])])
 
         ###
@@ -341,4 +339,4 @@ if __name__ == '__main__':
             sentences_in_summary = list(chain.from_iterable([theme_to_sents[theme] for theme in order_of_themes]))
 
         # Prints selected sentences to file
-        export_summary.export_summary(sentences_in_summary, topic_id[:6], "2", "../outputs/D3")
+        export_summary.export_summary(sentences_in_summary, topic_id[:6], "2", args.output_dir)
