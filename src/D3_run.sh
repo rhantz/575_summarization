@@ -15,6 +15,10 @@ python3 tf_idf.py 0.3 10
 echo "Generating summaries with [ILP]"
 python3 ilp.py devtest
 
+# Summarization - baseline
+echo "Generating summaries with [baseline]"
+python3 baseline.py
+
 # Evaluation
 echo "Outputting evaluation results"
 python3 run_rouge_eval.py \
