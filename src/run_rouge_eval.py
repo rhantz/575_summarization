@@ -40,9 +40,10 @@ def collect_summaries(summary_path: str) -> dict:
     """
     summary_dict = defaultdict(list)
     summaries = os.listdir(summary_path)
+    summaries = [summary for summary in summaries if (os.path.isfile(summary_path+"/"+summary)) and ("DS_Store" not in summary)]
 
     for summary in summaries:
-        summary_method_id = summary[-1]
+        summary_method_id = summary.split(".")[-1]
         summary_dict[summary_method_id].append(summary)
     return summary_dict
 
@@ -66,7 +67,7 @@ def collect_models(model_path: str) -> dict:
     models = os.listdir(model_path)
 
     for model in models:
-        eval_id = model[:-2]
+        eval_id = ".".join(model.split(".")[:-1])
         model_dict[eval_id].append(model)
     return model_dict
 
@@ -115,7 +116,7 @@ def evaluate_results(summary_dict: dict, model_dict: dict):
     rouge_methods = args.rouge_methods
     for summary_method_id, summary_files in summary_dict.items():
         for summary_file in summary_files:
-            model_eval_id = summary_file[:-2]
+            model_eval_id = ".".join(summary_file.split(".")[:-1])
             summary = load_data(args.summary_path + "/" + summary_file)
             summary_rouge_scores = defaultdict(lambda: defaultdict(list)) # store the results of the current summary file before taking the average (scores evaluated on different model files)
             for model_file in model_dict[model_eval_id]:
@@ -160,6 +161,10 @@ def output_eval_results():
     Nothing is returned
     
     """
+    # sort the method ids in the result dict
+    summary_method_ids = list(total_results.keys())
+    summary_method_ids.sort()
+    total_results = {i: total_results[i] for i in summary_method_ids}
 
     eval_output = ""
     for summary_method_id, all_rouge_scores in total_results.items():
