@@ -35,7 +35,7 @@ def main():
         articles = sorted([f for f in listdir(topic_directory) if isfile(join(topic_directory, f))])
         article_string = read_article(f"../outputs/devtest/{topic_id}/"+articles[0])          
         summary = getSummary(article_string)
-        export_summary.export_summary(summary, topic_id[:6], "3", "../outputs/D3")
+        export_summary.export_summary(summary, topic_id[:6], "3", "../outputs/D4")
 
 if __name__ == '__main__':
     main()

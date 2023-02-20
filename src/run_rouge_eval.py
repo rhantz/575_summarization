@@ -161,11 +161,6 @@ def output_eval_results():
     Nothing is returned
     
     """
-    # sort the method ids in the result dict
-    summary_method_ids = list(total_results.keys())
-    summary_method_ids.sort()
-    total_results = {i: total_results[i] for i in summary_method_ids}
-
     eval_output = ""
     for summary_method_id, all_rouge_scores in total_results.items():
         for rouge_score_type, rouge_scores in all_rouge_scores.items():
@@ -222,6 +217,11 @@ if __name__ == "__main__":
 
     # run evaluation metrics
     evaluate_results(summary_dict, model_dict)
+
+    # sort the method ids in the result dict
+    summary_method_ids = list(total_results.keys())
+    summary_method_ids.sort()
+    total_results = {i: total_results[i] for i in summary_method_ids}
 
     # print out results to a file
     output_eval_results()
