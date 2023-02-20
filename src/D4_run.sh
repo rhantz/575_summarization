@@ -1,8 +1,7 @@
 #!/bin/sh
 
 source ~/anaconda3/etc/profile.d/conda.sh
-# conda activate ../env
-conda activate /home2/hantz1rk/ling575/575_summarization/env
+conda activate ../env
 
 # Preprocess document
 echo "Preprocessing documents"
