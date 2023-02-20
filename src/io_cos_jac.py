@@ -107,7 +107,8 @@ def writeSummary(newOrder, dir, file):
     #topic_id D1001A
     topic_id = file[0:5]+file[-3]
     num = file[-1]
-    export_summary.export_summary(sent, topic_id, num+str(sys.argv[1]) , "../outputs/D4/A")
+    export_dir = sys.argv[3]
+    export_summary.export_summary(sent, topic_id, num+str(sys.argv[1]) , export_dir) #"../outputs/D4/A"
     
 
 def main():
