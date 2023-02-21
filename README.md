@@ -18,6 +18,8 @@ Chenxi Li
 
 ___________________________
 
+Download Code at Release D2
+
 D2: Process a DocSet
 
 Script `proc_docset.py` is under `src/`
@@ -38,6 +40,8 @@ Preprocessed and tokenized documents are stored under `outputs`
 
 ___________________________
 
+Download Code at Release D3
+
 D3: Initial System - Content Selection
 
 Scripts `tf_idf.py`, `ilp.py`, and `run_rouge_eval.py` are under `src/`
@@ -54,4 +58,32 @@ or
 
 `condor_submit ../D3.cmd`
 
+Summaries will print under `outputs/D3`
+
+Results will print under `results/D3`
+
 __________________________
+
+Download Code at Release D4
+
+D4: Improved System - Information Ordering
+
+Scripts `cluster.py`, `build_theme_graph.py`, `baseline.py`, and `io_cos_jac.py` are under `src/`
+
+To run the improved system with Information Ordering methods included:
+
+`cd src`
+
+and run either:
+
+`./D4_run.sh`
+
+or 
+
+`condor_submit ../D4.cmd`
+
+Summaries will print under `outputs/D4` along with an indermediate directory `ilp_cos`
+
+Results will print under  `results/D4`
+
+____________________________
