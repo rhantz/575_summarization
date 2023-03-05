@@ -96,10 +96,10 @@ if __name__ == '__main__':
     all_sent = []
     for topic_id in sorted(topic_ids):
         one_set = []
-        topic_directory = f"../outputs/devtest/{topic_id}"
+        topic_directory = f"../outputs/{args.input_dir}/{topic_id}"
         articles = sorted([f for f in listdir(topic_directory) if isfile(join(topic_directory, f))])
         for name in articles:
-            article_string = read_article(f"../outputs/devtest/{topic_id}/{name}")
+            article_string = read_article(f"../outputs/{args.input_dir}/{topic_id}/{name}")
             sent_string = article_string.split('\n')
             one_set.append(article_string)
             one_set_string = " ".join(one_set)
