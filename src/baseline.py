@@ -2,6 +2,7 @@ import pdb
 from os import listdir
 from os.path import isfile, join
 import export_summary
+import sys
 
 # Function to read in an article and return it as a single string
 def read_article(file_path):
@@ -25,17 +26,18 @@ def getSummary(article_string):
     return result
 
 def main():
-    directory = "../outputs/devtest"
+    directory = sys.argv[1] #"../outputs/devtest"
     topic_ids = sorted([d for d in listdir(directory) if not isfile(join(directory, d))])
     total_top = len(topic_ids)
     all_set = []
+    export_dir = sys.argv[2]
     for topic_id in sorted(topic_ids):
         one_set = []
-        topic_directory = f"../outputs/devtest/{topic_id}"
+        topic_directory =  directory+'/'+str(topic_id) #f"../outputs/devtest/{topic_id}"
         articles = sorted([f for f in listdir(topic_directory) if isfile(join(topic_directory, f))])
         article_string = read_article(f"../outputs/devtest/{topic_id}/"+articles[0])          
         summary = getSummary(article_string)
-        export_summary.export_summary(summary, topic_id[:6], "3", "../outputs/D4")
+        export_summary.export_summary(summary, topic_id[:6], "3", export_dir) #"../outputs/D4"
 
 if __name__ == '__main__':
     main()
