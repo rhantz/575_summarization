@@ -116,7 +116,11 @@ def main():
     fileNames = read_filename(dir)
     for file in fileNames:
         sentences, sentences_without_stopword = read_summary(dir, file)
-        newOrder = reorder(sentences, sentences_without_stopword)
+        if (len(sentences) > 1):
+            newOrder = reorder(sentences, sentences_without_stopword)
+            writeSummary(newOrder, dir, file)
+        else:
+            newOrder = '(0)'
         writeSummary(newOrder, dir, file)
 
 
