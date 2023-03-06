@@ -35,7 +35,8 @@ def main():
         one_set = []
         topic_directory =  directory+'/'+str(topic_id) #f"../outputs/devtest/{topic_id}"
         articles = sorted([f for f in listdir(topic_directory) if isfile(join(topic_directory, f))])
-        article_string = read_article(f"../outputs/devtest/{topic_id}/"+articles[0])          
+        # article_string = read_article(f"../outputs/devtest/{topic_id}/"+articles[0])    
+        article_string = read_article(topic_directory + "/" + articles[0])      
         summary = getSummary(article_string)
         export_summary.export_summary(summary, topic_id[:6], "3", export_dir) #"../outputs/D4"
 
