@@ -25,15 +25,15 @@ python3 ilp.py \
     --skipgram_degree 1 \
     --remove_punctuation \
     --min_sent_length 5  \
-    --output_dir ../outputs/D5/ilp_cos
+    --output_dir ../outputs/D5/ilp_cos/devtest
 
 # Information ordering for [ILP] summaries
 echo "Reordering summaries generated with [ILP]: cosine similarity ordering"
-python3 io_cos_jac.py c ../outputs/D5/ilp_cos ../outputs/D5/before_CR/devtest
+python3 io_cos_jac.py c ../outputs/D5/ilp_cos/devtest ../outputs/D5/before_CR/devtest
 
 # Summarization - baseline
-echo "Generating summaries with [baseline]"
-python3 baseline.py ../outputs/devtest ../outputs/D5/before_CR/devtest
+# echo "Generating summaries with [baseline]"
+# python3 baseline.py ../outputs/devtest ../outputs/D5/before_CR/devtest
 
 # Content Realization
 echo "Performing content realization"
