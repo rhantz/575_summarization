@@ -154,7 +154,8 @@ def read_sentences(topic_id: str) -> tuple:
 
     """
 
-    topic_directory = f"../outputs/devtest/{topic_id}"
+    # topic_directory = f"../outputs/devtest/{topic_id}"
+    topic_directory = f"../outputs/{args.input_dir}/{topic_id}"
     articles = [f for f in listdir(topic_directory) if isfile(join(topic_directory, f))]
 
     # sorts articles by date (the date is the last 13 characters of the article title)
