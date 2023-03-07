@@ -86,4 +86,38 @@ Summaries will print under `outputs/D4` along with an indermediate directory `il
 
 Results will print under  `results/D4`
 
-____________________________
+___________________________
+
+Download Code at Release D5
+
+D5: Final System - Content Realization
+
+Scripts `solve_PPN.py` and `find_people.py` are under src/
+
+To run the final system on the development dataset with Content Realization method included:
+
+`cd src`
+
+and run:
+
+`./D5_run_dev.sh`
+
+Summaries will print under `outputs/D5_devtest`
+
+Results will print under `results`
+
+To run the final system on the evaluation dataset with Content Realization method included:
+
+`cd src`
+
+and run either:
+
+`./D5_run.sh`
+
+or
+
+`condor_submit ../D5.cmd`
+
+Summaries will print under `outputs/D5_evaltest`
+
+Results will print under `results`
